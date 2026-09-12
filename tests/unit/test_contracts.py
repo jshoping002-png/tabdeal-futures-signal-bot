@@ -153,3 +153,17 @@ def test_signal_decision_requires_string_snapshot_id():
             config_version="v1",
             reason_code="LONG_OK",
         )
+
+
+def test_signal_decision_requires_string_config_version():
+    from tabdeal_signal.domain.contracts import SignalDecision
+
+    with pytest.raises(ValueError, match="config_version must be a string"):
+        SignalDecision(
+            signal_id="sig-1",
+            direction=Direction.LONG,
+            created_at=datetime(2026, 1, 1, 1, tzinfo=UTC),
+            snapshot_id="s1",
+            config_version=123,  # type: ignore[arg-type]
+            reason_code="LONG_OK",
+        )
