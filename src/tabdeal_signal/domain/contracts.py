@@ -113,6 +113,8 @@ class SignalDecision:
             raise ValueError("signal_id is required")
         if not isinstance(self.direction, Direction):
             raise ValueError("direction must be a Direction")
+        if not isinstance(self.created_at, datetime):
+            raise ValueError("created_at must be a datetime")
         if self.created_at.tzinfo is None or self.created_at.tzinfo != UTC:
             raise ValueError("created_at must be UTC")
         if not self.snapshot_id.strip() or not self.config_version.strip():
