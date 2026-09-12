@@ -74,3 +74,20 @@ def test_side_decision_requires_direction_enum():
 def test_side_decision_requires_status_enum():
     with pytest.raises(ValueError, match="DecisionStatus"):
         SideDecision(Direction.LONG, "SIGNAL", "LONG_OK")
+
+
+def test_decision_context_requires_string_ids():
+    with pytest.raises(ValueError, match="strings"):
+        DecisionContext(
+            decision_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
+            reference_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
+            snapshot_id=["snap-1"],  # type: ignore[arg-type]
+            config_version="v1",
+        )
+    with pytest.raises(ValueError, match="strings"):
+        DecisionContext(
+            decision_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
+            reference_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
+            snapshot_id="snap-1",
+            config_version=["v1"],  # type: ignore[arg-type]
+        )
