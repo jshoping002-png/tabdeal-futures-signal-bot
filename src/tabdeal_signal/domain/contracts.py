@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
+from math import isfinite
 from typing import Final
 
 
@@ -42,6 +43,8 @@ class Candle:
             raise ValueError("candle timestamps must be UTC")
         if self.close_time <= self.open_time:
             raise ValueError("close_time must be after open_time")
+        if not all(isfinite(value) for value in (self.open, self.high, self.low, self.close, self.volume)):
+            raise ValueError("candle numeric values must be finite")
         if self.high < max(self.open, self.close) or self.low > min(self.open, self.close):
             raise ValueError("invalid OHLC bounds")
         if self.low > self.high:

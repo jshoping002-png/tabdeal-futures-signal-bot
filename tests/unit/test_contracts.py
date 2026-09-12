@@ -50,6 +50,13 @@ def test_non_utc_candle_timestamp_is_rejected():
         candle(open_time=datetime(2026, 1, 1, tzinfo=plus_one))
 
 
+def test_non_finite_candle_numeric_value_is_rejected():
+    with pytest.raises(ValueError, match="finite"):
+        candle(close=float("nan"))
+    with pytest.raises(ValueError, match="finite"):
+        candle(volume=float("inf"))
+
+
 def test_invalid_ohlc_is_rejected():
     with pytest.raises(ValueError, match="OHLC"):
         candle(high=99.0)
