@@ -46,6 +46,8 @@ class MarketSnapshot:
             raise ValueError("candles must be a tuple")
         if not self.candles or any(not isinstance(candle, Candle) for candle in self.candles):
             raise ValueError("candles must contain Candle instances")
+        if not isinstance(self.snapshot_id, str):
+            raise ValueError("snapshot_id must be a string")
         if not self.snapshot_id.strip():
             raise ValueError("snapshot_id is required")
         if not self.source_id.strip():
