@@ -36,6 +36,12 @@ def test_strategy_request_rejects_non_decision_context() -> None:
         StrategyEvaluationRequest(object(), snapshot)  # type: ignore[arg-type]
 
 
+def test_strategy_request_rejects_non_market_snapshot() -> None:
+    reference_time = datetime(2026, 1, 1, 1, 0, 0, 1, tzinfo=UTC)
+    with pytest.raises(ValueError, match="MarketSnapshot"):
+        StrategyEvaluationRequest(context(reference_time), object())  # type: ignore[arg-type]
+
+
 def test_strategy_evaluation_is_immutable_and_maps_to_side_decision() -> None:
     result = StrategyEvaluation(Direction.LONG, True, "LONG_RULES_PASS")
     assert result.to_side_decision().status is DecisionStatus.SIGNAL
