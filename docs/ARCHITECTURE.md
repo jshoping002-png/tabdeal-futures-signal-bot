@@ -1,4 +1,4 @@
-# Architecture — Phase 5
+# Architecture — Phase 6
 
 ## Scope
 
@@ -6,7 +6,7 @@ The system is a signal/alert engine only. Order execution and auto-trading are o
 
 ## Decision pipeline
 
-Data Source → Validation → Point-in-Time Snapshot → Series Integrity → Strategy Evaluation → LONG / SHORT Isolation → Conflict Gate → Risk Gate → Decision → Persistence/Outbox → Notification
+Data Source → Validation → Point-in-Time Snapshot → Series Integrity → Explicit Candle Alignment → Strategy Evaluation → LONG / SHORT Isolation → Conflict Gate → Risk Gate → Decision → Persistence/Outbox → Notification
 
 Each boundary has an explicit contract. Invalid or uncertain critical input fails closed.
 
@@ -16,33 +16,33 @@ Each boundary has an explicit contract. Invalid or uncertain critical input fail
 2. Only closed candles may enter a signal decision.
 3. A snapshot is immutable once created.
 4. Candle series must not contain gaps, overlaps, invalid durations, or ambiguous timeframe semantics.
-5. LONG and SHORT evaluation paths do not consume each other's outputs.
-6. Conflict Gate is the only component allowed to compare LONG vs SHORT outcomes.
-7. A deterministic input snapshot plus deterministic config produces one deterministic result.
-8. Critical failures produce no signal.
-9. Signal identity must be idempotent.
-10. Runtime data and generated artifacts never belong in Git.
-11. Runtime never mutates Git.
+5. Candle boundary alignment must be explicitly supplied; exchange/session anchoring is never inferred.
+6. LONG and SHORT evaluation paths do not consume each other's outputs.
+7. Conflict Gate is the only component allowed to compare LONG vs SHORT outcomes.
+8. A deterministic input snapshot plus deterministic config produces one deterministic result.
+9. Critical failures produce no signal.
+10. Signal identity must be idempotent.
+11. Runtime data and generated artifacts never belong in Git.
+12. Runtime never mutates Git.
 
-## Phase 5 — Candle Series Integrity Contract
+## Phase 6 — Explicit Candle Alignment Contract
 
 ### Responsibilities
 
-- Define explicit, fixed-duration timeframe semantics for minute/hour/day/week units.
-- Reject ambiguous calendar-month timeframes instead of guessing their duration.
-- Validate candle duration against the declared timeframe.
-- Detect non-deterministic ordering, overlapping candles, and gaps between adjacent candles.
-- Validate each symbol's series independently so no LONG/SHORT cross-talk is introduced.
-- Keep series validation pure and deterministic.
+- Require an explicit UTC anchor time for candle-boundary validation.
+- Validate that a candle's declared timeframe matches the policy timeframe.
+- Validate that candle open times fall exactly on the explicit timeframe boundary defined by the supplied anchor.
+- Reject non-UTC candle timestamps at the alignment boundary.
+- Return stable, deterministic reason codes without inferring an exchange or session calendar.
 
 ### Contract
 
-`TimeframeSpec.parse()` converts only explicitly supported fixed-duration timeframe codes into a `timedelta`.
+`AlignmentPolicy` binds a fixed-duration `TimeframeSpec` to an explicit UTC `anchor_time`.
 
-`SeriesIntegrityReport` is immutable. A valid report has no reason codes; an invalid report has one or more stable reason codes.
+`AlignmentPolicy.contains()` accepts only candles whose timeframe matches the policy and whose open time is an exact duration multiple from the anchor.
 
-`validate_candle_series()` validates one ordered candle series. `validate_snapshot_series()` applies the same integrity boundary independently to each symbol in a snapshot.
+`validate_alignment()` is pure and deterministic. It does not infer exchange-specific anchors, sessions, holidays, funding windows, or calendar semantics.
 
 ### Explicit boundary
 
-Phase 5 does not define exchange-specific candle anchoring, timezone/session calendars, market holidays, funding events, indicator calculations, or trading rules. Those require explicit contracts and must not be inferred from a generic timeframe string.
+Phase 6 does not define an exchange adapter, exchange-specific session/calendar rules, multi-timeframe parent-child mapping, indicator calculations, risk rules, or trading rules. Those require separate explicit contracts and must not be inferred.
