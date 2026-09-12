@@ -38,6 +38,8 @@ class MarketSnapshot:
     def __post_init__(self) -> None:
         if not isinstance(self.candles, tuple):
             raise ValueError("candles must be a tuple")
+        if not self.candles or any(not isinstance(candle, Candle) for candle in self.candles):
+            raise ValueError("candles must contain Candle instances")
         if not self.snapshot_id.strip():
             raise ValueError("snapshot_id is required")
         if not self.source_id.strip():
