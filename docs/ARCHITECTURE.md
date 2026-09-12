@@ -1,4 +1,4 @@
-# Architecture — Phase 3
+# Architecture — Phase 4
 
 ## Scope
 
@@ -72,3 +72,26 @@ Phase 2 does not yet select an exchange API, implement network retries, calculat
 ### Non-goals
 
 Phase 3 does not define the actual 4H/1H trading rules, indicators, thresholds, exchange adapter, data acquisition, LONG-vs-SHORT conflict resolution, risk filters, persistence, notifications, or scheduling. Those require their own contracts and phase gates.
+
+## Phase 4 — Market Data Integrity Validation
+
+### Responsibilities
+
+- Validate the relationship between a requested point-in-time dataset and the returned immutable snapshot.
+- Reject missing requested symbol/timeframe pairs and unrequested pairs.
+- Reject non-finite OHLCV values and non-positive prices before strategy consumption.
+- Reject future/unavailable candles and reference-time mismatches.
+- Return deterministic, immutable validation results with explicit machine-readable reason codes.
+- Keep validation pure: no system clock, network calls, retries, randomness, scheduler state, persistence, notifications, or Git mutation.
+
+### Contract
+
+`ValidationIssue` contains a stable issue code and human-readable detail.
+
+`ValidationReport` is immutable. A valid report contains no issues; an invalid report contains at least one issue.
+
+`validate_snapshot(request, snapshot)` is deterministic for the same request and snapshot. Any critical integrity failure produces an invalid report and therefore must prevent signal generation downstream.
+
+### Explicit boundary
+
+Phase 4 does not infer candle interval semantics, repair gaps, synthesize missing candles, select an exchange/provider, or decide trading rules. Gap detection requires an explicit timeframe/interval contract and is deferred until that contract is designed.
