@@ -50,6 +50,8 @@ class MarketSnapshot:
             raise ValueError("snapshot_id is required")
         if not self.source_id.strip():
             raise ValueError("source_id is required")
+        if not isinstance(self.reference_time, datetime):
+            raise ValueError("reference_time must be a datetime")
         if self.reference_time.tzinfo is None or self.reference_time.tzinfo != UTC:
             raise ValueError("reference_time must be UTC")
         if not self.candles:
