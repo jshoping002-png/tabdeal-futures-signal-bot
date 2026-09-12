@@ -96,6 +96,15 @@ def test_side_decision_requires_status_enum():
         SideDecision(Direction.LONG, "SIGNAL", "LONG_OK")
 
 
+def test_side_decision_requires_string_reason_code():
+    with pytest.raises(ValueError, match="reason_code must be a string"):
+        SideDecision(
+            Direction.LONG,
+            DecisionStatus.SIGNAL,
+            123,  # type: ignore[arg-type]
+        )
+
+
 def test_decision_context_requires_string_ids():
     with pytest.raises(ValueError, match="strings"):
         DecisionContext(
