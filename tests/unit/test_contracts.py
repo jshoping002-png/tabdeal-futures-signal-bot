@@ -28,6 +28,17 @@ def test_valid_closed_candle_is_accepted():
     assert candle().close > candle().open
 
 
+def test_candle_is_available_only_at_or_after_close():
+    item = candle()
+    assert not item.is_available_at(datetime(2026, 1, 1, 0, 59, 59, tzinfo=UTC))
+    assert item.is_available_at(datetime(2026, 1, 1, 1, tzinfo=UTC))
+
+
+def test_candle_availability_rejects_non_utc_reference_time():
+    with pytest.raises(ValueError, match="UTC"):
+        candle().is_available_at(datetime(2026, 1, 1, 1))
+
+
 def test_naive_candle_timestamp_is_rejected():
     with pytest.raises(ValueError, match="timezone-aware"):
         candle(open_time=datetime(2026, 1, 1))
@@ -42,6 +53,11 @@ def test_non_utc_candle_timestamp_is_rejected():
 def test_invalid_ohlc_is_rejected():
     with pytest.raises(ValueError, match="OHLC"):
         candle(high=99.0)
+
+
+def test_empty_timeframe_is_rejected():
+    with pytest.raises(ValueError, match="timeframe"):
+        candle(timeframe=" ")
 
 
 def test_future_reference_time_is_rejected():
