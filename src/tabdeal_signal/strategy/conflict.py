@@ -34,4 +34,9 @@ def apply_conflict_gate(
     ):
         return long_decision, short_decision
 
-    return resolver.resolve(long_decision, short_decision)
+    resolved_long, resolved_short = resolver.resolve(long_decision, short_decision)
+    if resolved_long.direction is not Direction.LONG:
+        raise ValueError("conflict resolver must preserve LONG output direction")
+    if resolved_short.direction is not Direction.SHORT:
+        raise ValueError("conflict resolver must preserve SHORT output direction")
+    return resolved_long, resolved_short
