@@ -111,3 +111,17 @@ def test_decision_context_requires_string_ids():
             snapshot_id="snap-1",
             config_version=["v1"],  # type: ignore[arg-type]
         )
+
+
+def test_signal_decision_requires_string_signal_id():
+    from tabdeal_signal.domain.contracts import SignalDecision
+
+    with pytest.raises(ValueError, match="signal_id must be a string"):
+        SignalDecision(
+            signal_id=123,  # type: ignore[arg-type]
+            direction=Direction.LONG,
+            created_at=datetime(2026, 1, 1, 1, tzinfo=UTC),
+            snapshot_id="s1",
+            config_version="v1",
+            reason_code="LONG_OK",
+        )
