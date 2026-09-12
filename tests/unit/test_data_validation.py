@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta, timezone
 from math import inf, nan
 
+import pytest
+
 from tabdeal_signal.data.contracts import MarketSnapshot, SnapshotRequest
 from tabdeal_signal.data.validation import validate_snapshot
 from tabdeal_signal.domain.contracts import Candle
@@ -46,12 +48,9 @@ def test_unrequested_pair_blocks() -> None:
     assert any(issue.code == "UNREQUESTED_DATA" for issue in report.issues)
 
 
-def test_non_finite_value_blocks() -> None:
-    ref = candle(1).close_time
-    bad = Candle("BTCUSDT", "1h", candle(0).open_time, candle(0).close_time, 100, 110, 90, nan, 1)
-    report = validate_snapshot(request(ref), snapshot(ref, bad))
-    assert report.valid is False
-    assert any(issue.code == "NON_FINITE_VALUE" for issue in report.issues)
+def test_non_finite_value_is_rejected_at_candle_boundary() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        Candle("BTCUSDT", "1h", candle(0).open_time, candle(0).close_time, 100, 110, 90, nan, 1)
 
 
 def test_non_positive_price_blocks() -> None:
@@ -84,9 +83,6 @@ def test_validation_report_is_immutable() -> None:
         raise AssertionError("validation report must be immutable")
 
 
-def test_infinity_is_detected_without_affecting_request_state() -> None:
-    ref = candle(1).close_time
-    bad = Candle("BTCUSDT", "1h", candle(0).open_time, candle(0).close_time, 100, inf, 90, 105, 1)
-    report = validate_snapshot(request(ref), snapshot(ref, bad))
-    assert report.valid is False
-    assert any(issue.code == "NON_FINITE_VALUE" for issue in report.issues)
+def test_infinity_is_rejected_at_candle_boundary() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        Candle("BTCUSDT", "1h", candle(0).open_time, candle(0).close_time, 100, inf, 90, 105, 1)
