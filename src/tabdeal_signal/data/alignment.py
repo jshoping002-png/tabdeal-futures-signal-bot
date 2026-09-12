@@ -28,11 +28,19 @@ class AlignmentPolicy:
 
 
 def validate_alignment(candles: tuple[Candle, ...], policy: AlignmentPolicy) -> tuple[str, ...]:
-    """Return stable reason codes for candles that violate an explicit boundary policy."""
-    reasons: list[str] = []
+    """Return deterministic reason codes independent of candle iteration order."""
+    has_non_utc_timestamp = False
+    has_boundary_mismatch = False
+
     for candle in candles:
         if candle.open_time.tzinfo != UTC or candle.close_time.tzinfo != UTC:
-            reasons.append("NON_UTC_TIMESTAMP")
+            has_non_utc_timestamp = True
         if not policy.contains(candle):
-            reasons.append("CANDLE_BOUNDARY_MISMATCH")
-    return tuple(dict.fromkeys(reasons))
+            has_boundary_mismatch = True
+
+    reasons: list[str] = []
+    if has_non_utc_timestamp:
+        reasons.append("NON_UTC_TIMESTAMP")
+    if has_boundary_mismatch:
+        reasons.append("CANDLE_BOUNDARY_MISMATCH")
+    return tuple(reasons)
