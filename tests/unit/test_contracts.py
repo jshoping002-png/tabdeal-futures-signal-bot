@@ -2,24 +2,13 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tabdeal_signal.domain.contracts import Candle, DecisionContext, Direction
-
+from tabdeal_signal.domain.contracts import Candle, DecisionContext, DecisionStatus, Direction, SideDecision
 
 UTC = timezone.utc
 
 
 def candle(**overrides):
-    values = dict(
-        symbol="BTCUSDT",
-        timeframe="1h",
-        open_time=datetime(2026, 1, 1, tzinfo=UTC),
-        close_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
-        open=100.0,
-        high=110.0,
-        low=90.0,
-        close=105.0,
-        volume=1.0,
-    )
+    values = dict(symbol="BTCUSDT", timeframe="1h", open_time=datetime(2026, 1, 1, tzinfo=UTC), close_time=datetime(2026, 1, 1, 1, tzinfo=UTC), open=100.0, high=110.0, low=90.0, close=105.0, volume=1.0)
     values.update(overrides)
     return Candle(**values)
 
@@ -70,13 +59,18 @@ def test_empty_timeframe_is_rejected():
 
 def test_future_reference_time_is_rejected():
     with pytest.raises(ValueError, match="after"):
-        DecisionContext(
-            decision_time=datetime(2026, 1, 1, tzinfo=UTC),
-            reference_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
-            snapshot_id="s1",
-            config_version="v1",
-        )
+        DecisionContext(decision_time=datetime(2026, 1, 1, tzinfo=UTC), reference_time=datetime(2026, 1, 1, 1, tzinfo=UTC), snapshot_id="s1", config_version="v1")
 
 
 def test_direction_is_explicitly_isolated():
     assert Direction.LONG.value != Direction.SHORT.value
+
+
+def test_side_decision_requires_direction_enum():
+    with pytest.raises(ValueError, match="Direction"):
+        SideDecision("LONG", DecisionStatus.SIGNAL, "LONG_OK")
+
+
+def test_side_decision_requires_status_enum():
+    with pytest.raises(ValueError, match="DecisionStatus"):
+        SideDecision(Direction.LONG, "SIGNAL", "LONG_OK")
