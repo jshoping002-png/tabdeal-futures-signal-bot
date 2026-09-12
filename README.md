@@ -22,4 +22,4 @@ The system produces and alerts on trading signals. Execution of trades is explic
 
 ## Status
 
-Phase 1 foundation is being built under gated engineering verification.
+Phases 1–6 foundations and the LONG/SHORT isolation + Conflict Gate contracts are implemented and under gated engineering verification. Production readiness has not been declared.
