@@ -65,6 +65,12 @@ def test_snapshot_rejects_non_string_snapshot_id() -> None:
         MarketSnapshot(123, "source-a", c.close_time + timedelta(microseconds=1), (c,))  # type: ignore[arg-type]
 
 
+def test_snapshot_rejects_non_string_source_id() -> None:
+    c = candle(0)
+    with pytest.raises(ValueError, match="source_id must be a string"):
+        MarketSnapshot("snap-1", 123, c.close_time + timedelta(microseconds=1), (c,))  # type: ignore[arg-type]
+
+
 def test_request_rejects_duplicate_symbols_and_timeframes() -> None:
     ref = datetime(2026, 1, 1, tzinfo=UTC)
     with pytest.raises(ValueError, match="symbols"):
