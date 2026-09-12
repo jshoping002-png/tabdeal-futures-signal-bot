@@ -125,3 +125,17 @@ def test_signal_decision_requires_string_signal_id():
             config_version="v1",
             reason_code="LONG_OK",
         )
+
+
+def test_signal_decision_rejects_non_datetime_created_at():
+    from tabdeal_signal.domain.contracts import SignalDecision
+
+    with pytest.raises(ValueError, match="created_at must be a datetime"):
+        SignalDecision(
+            signal_id="sig-1",
+            direction=Direction.LONG,
+            created_at="2026-01-01T01:00:00Z",  # type: ignore[arg-type]
+            snapshot_id="s1",
+            config_version="v1",
+            reason_code="LONG_OK",
+        )
