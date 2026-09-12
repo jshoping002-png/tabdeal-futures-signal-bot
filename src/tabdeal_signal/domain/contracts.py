@@ -125,5 +125,7 @@ class SignalDecision:
             raise ValueError("config_version must be a string")
         if not self.config_version.strip():
             raise ValueError("config_version is required")
+        if not isinstance(self.reason_code, str):
+            raise ValueError("reason_code must be a string")
         if not self.reason_code.strip():
             raise ValueError("reason_code is required")
