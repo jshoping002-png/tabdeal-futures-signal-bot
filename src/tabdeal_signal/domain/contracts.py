@@ -107,6 +107,8 @@ class SignalDecision:
     reason_code: str
 
     def __post_init__(self) -> None:
+        if not isinstance(self.signal_id, str):
+            raise ValueError("signal_id must be a string")
         if not self.signal_id.strip():
             raise ValueError("signal_id is required")
         if not isinstance(self.direction, Direction):
