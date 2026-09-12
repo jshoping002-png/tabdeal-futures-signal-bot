@@ -62,6 +62,16 @@ def test_future_reference_time_is_rejected():
         DecisionContext(decision_time=datetime(2026, 1, 1, tzinfo=UTC), reference_time=datetime(2026, 1, 1, 1, tzinfo=UTC), snapshot_id="s1", config_version="v1")
 
 
+def test_decision_context_rejects_non_datetime_decision_time():
+    with pytest.raises(ValueError, match="decision_time must be a datetime"):
+        DecisionContext(
+            decision_time="2026-01-01T01:00:00Z",  # type: ignore[arg-type]
+            reference_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
+            snapshot_id="s1",
+            config_version="v1",
+        )
+
+
 def test_direction_is_explicitly_isolated():
     assert Direction.LONG.value != Direction.SHORT.value
 
