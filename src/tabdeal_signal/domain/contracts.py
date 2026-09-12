@@ -33,10 +33,10 @@ class Candle:
     volume: float
 
     def __post_init__(self) -> None:
-        if not isinstance(self.symbol, str) or not self.symbol.strip():
-            raise ValueError("symbol must be a non-empty string")
-        if not isinstance(self.timeframe, str) or not self.timeframe.strip():
-            raise ValueError("timeframe must be a non-empty string")
+        if not self.symbol.strip():
+            raise ValueError("symbol must not be empty")
+        if not self.timeframe.strip():
+            raise ValueError("timeframe must not be empty")
         if self.close_time.tzinfo is None or self.open_time.tzinfo is None:
             raise ValueError("candle timestamps must be timezone-aware")
         if self.open_time.tzinfo != UTC or self.close_time.tzinfo != UTC:
@@ -103,15 +103,13 @@ class SignalDecision:
     reason_code: str
 
     def __post_init__(self) -> None:
-        if not isinstance(self.signal_id, str) or not self.signal_id.strip():
-            raise ValueError("signal_id must be a non-empty string")
+        if not self.signal_id.strip():
+            raise ValueError("signal_id is required")
         if not isinstance(self.direction, Direction):
             raise ValueError("direction must be a Direction")
         if self.created_at.tzinfo is None or self.created_at.tzinfo != UTC:
             raise ValueError("created_at must be UTC")
-        if not isinstance(self.snapshot_id, str) or not isinstance(self.config_version, str):
-            raise ValueError("snapshot_id and config_version must be strings")
         if not self.snapshot_id.strip() or not self.config_version.strip():
             raise ValueError("snapshot_id and config_version are required")
-        if not isinstance(self.reason_code, str) or not self.reason_code.strip():
-            raise ValueError("reason_code must be a non-empty string")
+        if not self.reason_code.strip():
+            raise ValueError("reason_code is required")
