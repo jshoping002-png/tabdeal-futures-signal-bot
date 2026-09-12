@@ -24,6 +24,11 @@ def test_boundary_mismatch_is_blocked() -> None:
     assert validate_alignment((candle(2),), policy()) == ("CANDLE_BOUNDARY_MISMATCH",)
 
 
+def test_candle_before_anchor_is_blocked() -> None:
+    shifted = AlignmentPolicy(TimeframeSpec.parse("4h"), datetime(2026, 1, 1, 4, tzinfo=UTC))
+    assert validate_alignment((candle(0),), shifted) == ("CANDLE_BOUNDARY_MISMATCH",)
+
+
 def test_anchor_is_not_inferred_from_candle_data() -> None:
     shifted = AlignmentPolicy(TimeframeSpec.parse("4h"), datetime(2026, 1, 1, 2, tzinfo=UTC))
     assert validate_alignment((candle(2),), shifted) == ()
