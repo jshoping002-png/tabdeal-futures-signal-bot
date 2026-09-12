@@ -83,6 +83,10 @@ class SideDecision:
     reason_code: str
 
     def __post_init__(self) -> None:
+        if not isinstance(self.direction, Direction):
+            raise ValueError("direction must be a Direction")
+        if not isinstance(self.status, DecisionStatus):
+            raise ValueError("status must be a DecisionStatus")
         if not self.reason_code.strip():
             raise ValueError("reason_code is required")
 
