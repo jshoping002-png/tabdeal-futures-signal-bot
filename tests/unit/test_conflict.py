@@ -18,6 +18,11 @@ class StubResolver:
         )
 
 
+class CrossWiringResolver:
+    def resolve(self, long_decision, short_decision):
+        return short_decision, long_decision
+
+
 def test_non_conflicting_sides_pass_unchanged_without_calling_resolver():
     resolver = StubResolver()
     long = decision(Direction.LONG, DecisionStatus.SIGNAL, "LONG_OK")
@@ -55,3 +60,16 @@ def test_wrong_direction_is_rejected():
         assert "long_decision" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_resolver_cannot_cross_wire_long_and_short_outputs():
+    try:
+        apply_conflict_gate(
+            decision(Direction.LONG, DecisionStatus.SIGNAL, "LONG_OK"),
+            decision(Direction.SHORT, DecisionStatus.SIGNAL, "SHORT_OK"),
+            resolver=CrossWiringResolver(),
+        )
+    except ValueError as exc:
+        assert "LONG output direction" in str(exc)
+    else:
+        raise AssertionError("cross-wired resolver output must be rejected")
