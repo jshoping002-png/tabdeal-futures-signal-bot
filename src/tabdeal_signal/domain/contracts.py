@@ -33,6 +33,10 @@ class Candle:
     volume: float
 
     def __post_init__(self) -> None:
+        if not isinstance(self.symbol, str):
+            raise ValueError("symbol must be a string")
+        if not isinstance(self.timeframe, str):
+            raise ValueError("timeframe must be a string")
         if not self.symbol.strip():
             raise ValueError("symbol must not be empty")
         if not self.timeframe.strip():
