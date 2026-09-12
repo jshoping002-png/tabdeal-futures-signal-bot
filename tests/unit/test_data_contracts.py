@@ -67,3 +67,15 @@ def test_request_rejects_mutable_collections() -> None:
         SnapshotRequest(["BTCUSDT"], ("1h",), ref)  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="tuples"):
         SnapshotRequest(("BTCUSDT",), ["1h"], ref)  # type: ignore[arg-type]
+
+
+def test_request_rejects_non_string_symbol_members() -> None:
+    ref = datetime(2026, 1, 1, tzinfo=UTC)
+    with pytest.raises(ValueError, match="only strings"):
+        SnapshotRequest((123,), ("1h",), ref)  # type: ignore[arg-type]
+
+
+def test_request_rejects_non_string_timeframe_members() -> None:
+    ref = datetime(2026, 1, 1, tzinfo=UTC)
+    with pytest.raises(ValueError, match="only strings"):
+        SnapshotRequest(("BTCUSDT",), (60,), ref)  # type: ignore[arg-type]
