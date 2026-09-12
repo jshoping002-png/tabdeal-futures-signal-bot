@@ -15,6 +15,8 @@ class StrategyEvaluationRequest:
     def __post_init__(self) -> None:
         if self.snapshot.reference_time != self.context.reference_time:
             raise ValueError("snapshot reference_time must match decision context")
+        if self.snapshot.snapshot_id != self.context.snapshot_id:
+            raise ValueError("snapshot_id must match decision context")
 
 
 @dataclass(frozen=True, slots=True)
