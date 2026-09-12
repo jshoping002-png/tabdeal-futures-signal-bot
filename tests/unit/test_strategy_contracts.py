@@ -30,6 +30,12 @@ def test_strategy_request_requires_matching_reference_time() -> None:
         StrategyEvaluationRequest(mismatched, snapshot)
 
 
+def test_strategy_request_rejects_non_decision_context() -> None:
+    snapshot = MarketSnapshot("snap-1", "source-a", candle(0).close_time + timedelta(microseconds=1), (candle(0),))
+    with pytest.raises(ValueError, match="DecisionContext"):
+        StrategyEvaluationRequest(object(), snapshot)  # type: ignore[arg-type]
+
+
 def test_strategy_evaluation_is_immutable_and_maps_to_side_decision() -> None:
     result = StrategyEvaluation(Direction.LONG, True, "LONG_RULES_PASS")
     assert result.to_side_decision().status is DecisionStatus.SIGNAL
