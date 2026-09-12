@@ -117,6 +117,8 @@ class SignalDecision:
             raise ValueError("created_at must be a datetime")
         if self.created_at.tzinfo is None or self.created_at.tzinfo != UTC:
             raise ValueError("created_at must be UTC")
+        if not isinstance(self.snapshot_id, str):
+            raise ValueError("snapshot_id must be a string")
         if not self.snapshot_id.strip() or not self.config_version.strip():
             raise ValueError("snapshot_id and config_version are required")
         if not self.reason_code.strip():
