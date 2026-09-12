@@ -28,6 +28,8 @@ class SnapshotRequest:
             raise ValueError("timeframes must contain at least one non-empty timeframe")
         if len(set(self.timeframes)) != len(self.timeframes):
             raise ValueError("timeframes must not contain duplicates")
+        if not isinstance(self.reference_time, datetime):
+            raise ValueError("reference_time must be a datetime")
         if self.reference_time.tzinfo is None or self.reference_time.tzinfo != UTC:
             raise ValueError("reference_time must be UTC")
 
