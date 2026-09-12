@@ -119,7 +119,11 @@ class SignalDecision:
             raise ValueError("created_at must be UTC")
         if not isinstance(self.snapshot_id, str):
             raise ValueError("snapshot_id must be a string")
-        if not self.snapshot_id.strip() or not self.config_version.strip():
-            raise ValueError("snapshot_id and config_version are required")
+        if not self.snapshot_id.strip():
+            raise ValueError("snapshot_id is required")
+        if not isinstance(self.config_version, str):
+            raise ValueError("config_version must be a string")
+        if not self.config_version.strip():
+            raise ValueError("config_version is required")
         if not self.reason_code.strip():
             raise ValueError("reason_code is required")
