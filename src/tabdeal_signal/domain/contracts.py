@@ -69,6 +69,8 @@ class DecisionContext:
     def __post_init__(self) -> None:
         if not isinstance(self.decision_time, datetime):
             raise ValueError("decision_time must be a datetime")
+        if not isinstance(self.reference_time, datetime):
+            raise ValueError("reference_time must be a datetime")
         for value in (self.decision_time, self.reference_time):
             if value.tzinfo is None or value.tzinfo != UTC:
                 raise ValueError("decision timestamps must be UTC")
