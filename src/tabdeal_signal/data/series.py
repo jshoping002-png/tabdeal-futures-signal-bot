@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import timedelta
 import re
 
 from tabdeal_signal.data.contracts import MarketSnapshot
@@ -18,12 +18,18 @@ class TimeframeSpec:
 
     @classmethod
     def parse(cls, code: str) -> TimeframeSpec:
-        match = _TIMEFRAME_RE.fullmatch(code.strip().lower())
+        normalized = code.strip()
+        match = _TIMEFRAME_RE.fullmatch(normalized)
         if match is None:
-            raise ValueError("unsupported timeframe; use positive m/h/d/w units")
+            raise ValueError("unsupported timeframe; use lowercase positive m/h/d/w units")
         value = int(match.group("value"))
         unit = match.group("unit")
-        factors = {"m": timedelta(minutes=1), "h": timedelta(hours=1), "d": timedelta(days=1), "w": timedelta(weeks=1)}
+        factors = {
+            "m": timedelta(minutes=1),
+            "h": timedelta(hours=1),
+            "d": timedelta(days=1),
+            "w": timedelta(weeks=1),
+        }
         return cls(f"{value}{unit}", factors[unit] * value)
 
 
@@ -76,8 +82,16 @@ def validate_candle_series(candles: tuple[Candle, ...], timeframe: str) -> Serie
 
 
 def validate_snapshot_series(snapshot: MarketSnapshot, timeframe: str) -> SeriesIntegrityReport:
-    """Validate every series in a snapshot independently; no LONG/SHORT semantics are involved."""
+    """Validate every requested timeframe series independently; no LONG/SHORT semantics are involved."""
+    try:
+        TimeframeSpec.parse(timeframe)
+    except ValueError:
+        return SeriesIntegrityReport(False, ("INVALID_TIMEFRAME",))
+
     symbols = tuple(sorted({candle.symbol for candle in snapshot.candles if candle.timeframe == timeframe}))
+    if not symbols:
+        return SeriesIntegrityReport(False, ("EMPTY_SERIES",))
+
     reports = [
         validate_candle_series(snapshot.candles_for(symbol, timeframe), timeframe)
         for symbol in symbols
