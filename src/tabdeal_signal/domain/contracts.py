@@ -93,6 +93,8 @@ class SideDecision:
             raise ValueError("direction must be a Direction")
         if not isinstance(self.status, DecisionStatus):
             raise ValueError("status must be a DecisionStatus")
+        if not isinstance(self.reason_code, str):
+            raise ValueError("reason_code must be a string")
         if not self.reason_code.strip():
             raise ValueError("reason_code is required")
 
