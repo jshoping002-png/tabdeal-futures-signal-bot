@@ -53,6 +53,12 @@ def test_snapshot_rejects_non_candle_members() -> None:
         MarketSnapshot("snap-1", "source-a", c.close_time + timedelta(microseconds=1), (c, object()))  # type: ignore[arg-type]
 
 
+def test_snapshot_rejects_non_datetime_reference_time() -> None:
+    c = candle(0)
+    with pytest.raises(ValueError, match="datetime"):
+        MarketSnapshot("snap-1", "source-a", "2026-01-01T01:00:01Z", (c,))  # type: ignore[arg-type]
+
+
 def test_request_rejects_duplicate_symbols_and_timeframes() -> None:
     ref = datetime(2026, 1, 1, tzinfo=UTC)
     with pytest.raises(ValueError, match="symbols"):
