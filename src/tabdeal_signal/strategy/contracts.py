@@ -13,6 +13,8 @@ class StrategyEvaluationRequest:
     snapshot: MarketSnapshot
 
     def __post_init__(self) -> None:
+        if not isinstance(self.context, DecisionContext):
+            raise ValueError("context must be a DecisionContext")
         if self.snapshot.reference_time != self.context.reference_time:
             raise ValueError("snapshot reference_time must match decision context")
         if self.snapshot.snapshot_id != self.context.snapshot_id:
