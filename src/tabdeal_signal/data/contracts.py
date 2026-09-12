@@ -50,6 +50,8 @@ class MarketSnapshot:
             raise ValueError("snapshot_id must be a string")
         if not self.snapshot_id.strip():
             raise ValueError("snapshot_id is required")
+        if not isinstance(self.source_id, str):
+            raise ValueError("source_id must be a string")
         if not self.source_id.strip():
             raise ValueError("source_id is required")
         if not isinstance(self.reference_time, datetime):
