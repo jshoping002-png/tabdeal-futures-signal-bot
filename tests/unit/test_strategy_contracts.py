@@ -49,6 +49,16 @@ def test_strategy_evaluation_requires_reason_code() -> None:
         StrategyEvaluation(Direction.LONG, False, "")
 
 
+def test_strategy_evaluation_requires_direction_enum() -> None:
+    with pytest.raises(ValueError, match="Direction"):
+        StrategyEvaluation("LONG", True, "LONG_RULES_PASS")  # type: ignore[arg-type]
+
+
+def test_strategy_evaluation_requires_boolean_eligibility() -> None:
+    with pytest.raises(ValueError, match="bool"):
+        StrategyEvaluation(Direction.LONG, 1, "LONG_RULES_PASS")  # type: ignore[arg-type]
+
+
 def test_strategy_request_is_immutable() -> None:
     snapshot = MarketSnapshot("snap-1", "source-a", candle(1).close_time + timedelta(microseconds=1), (candle(0), candle(1)))
     request = StrategyEvaluationRequest(context(snapshot.reference_time), snapshot)
