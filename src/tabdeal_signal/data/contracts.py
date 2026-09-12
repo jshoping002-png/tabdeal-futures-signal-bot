@@ -70,6 +70,10 @@ class MarketSnapshot:
             raise ValueError("snapshot contains data unavailable at reference_time")
 
     def candles_for(self, symbol: str, timeframe: str) -> tuple[Candle, ...]:
+        if not isinstance(symbol, str):
+            raise ValueError("symbol must be a string")
+        if not isinstance(timeframe, str):
+            raise ValueError("timeframe must be a string")
         return tuple(
             candle
             for candle in self.candles
