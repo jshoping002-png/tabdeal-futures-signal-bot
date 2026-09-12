@@ -23,6 +23,16 @@ class StubEvaluator:
         return StrategyEvaluation(self.direction, self.eligible, self.reason)
 
 
+class WrongResultEvaluator(StubEvaluator):
+    def __init__(self, declared: Direction, returned: Direction) -> None:
+        super().__init__(declared, True, "WRONG_SIDE")
+        self.returned = returned
+
+    def evaluate(self, request: StrategyEvaluationRequest) -> StrategyEvaluation:
+        self.calls += 1
+        return StrategyEvaluation(self.returned, True, "WRONG_SIDE")
+
+
 def request() -> StrategyEvaluationRequest:
     snapshot = MarketSnapshot(
         snapshot_id="snap-1",
@@ -89,3 +99,23 @@ def test_evaluating_one_side_does_not_call_or_change_other_side():
     isolated.evaluate_short(request())
     assert long.calls == 1
     assert short.calls == 1
+
+
+def test_long_side_rejects_wrong_direction_from_evaluator():
+    isolated = IsolatedSideEvaluators(
+        long_evaluator=WrongResultEvaluator(Direction.LONG, Direction.SHORT),
+        short_evaluator=StubEvaluator(Direction.SHORT, True, "SHORT_OK"),
+    )
+
+    with pytest.raises(ValueError, match="non-LONG"):
+        isolated.evaluate_long(request())
+
+
+def test_short_side_rejects_wrong_direction_from_evaluator():
+    isolated = IsolatedSideEvaluators(
+        long_evaluator=StubEvaluator(Direction.LONG, True, "LONG_OK"),
+        short_evaluator=WrongResultEvaluator(Direction.SHORT, Direction.LONG),
+    )
+
+    with pytest.raises(ValueError, match="non-SHORT"):
+        isolated.evaluate_short(request())

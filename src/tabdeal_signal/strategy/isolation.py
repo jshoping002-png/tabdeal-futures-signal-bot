@@ -24,7 +24,13 @@ class IsolatedSideEvaluators:
             raise ValueError("short_evaluator must declare SHORT direction")
 
     def evaluate_long(self, request: StrategyEvaluationRequest) -> StrategyEvaluation:
-        return self.long_evaluator.evaluate(request)
+        result = self.long_evaluator.evaluate(request)
+        if result.direction is not Direction.LONG:
+            raise ValueError("long_evaluator returned non-LONG result")
+        return result
 
     def evaluate_short(self, request: StrategyEvaluationRequest) -> StrategyEvaluation:
-        return self.short_evaluator.evaluate(request)
+        result = self.short_evaluator.evaluate(request)
+        if result.direction is not Direction.SHORT:
+            raise ValueError("short_evaluator returned non-SHORT result")
+        return result
