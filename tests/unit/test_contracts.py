@@ -28,10 +28,11 @@ def test_valid_closed_candle_is_accepted():
     assert candle().close > candle().open
 
 
-def test_candle_is_available_only_at_or_after_close():
+def test_candle_is_available_only_before_close_boundary():
     item = candle()
     assert not item.is_available_at(datetime(2026, 1, 1, 0, 59, 59, tzinfo=UTC))
-    assert item.is_available_at(datetime(2026, 1, 1, 1, tzinfo=UTC))
+    assert not item.is_available_at(datetime(2026, 1, 1, 1, tzinfo=UTC))
+    assert item.is_available_at(datetime(2026, 1, 1, 1, 0, 1, tzinfo=UTC))
 
 
 def test_candle_availability_rejects_non_utc_reference_time():

@@ -53,10 +53,10 @@ class Candle:
             raise ValueError("volume must not be negative")
 
     def is_available_at(self, reference_time: datetime) -> bool:
-        """Return True only when the candle was fully closed by reference_time."""
+        """Return True only when the candle closed strictly before reference_time."""
         if reference_time.tzinfo is None or reference_time.tzinfo != UTC:
             raise ValueError("reference_time must be UTC")
-        return self.close_time <= reference_time
+        return self.close_time < reference_time
 
 
 @dataclass(frozen=True, slots=True)
