@@ -16,10 +16,14 @@ class SnapshotRequest:
     def __post_init__(self) -> None:
         if not isinstance(self.symbols, tuple) or not isinstance(self.timeframes, tuple):
             raise ValueError("symbols and timeframes must be tuples")
+        if any(not isinstance(symbol, str) for symbol in self.symbols):
+            raise ValueError("symbols must contain only strings")
         if not self.symbols or any(not symbol.strip() for symbol in self.symbols):
             raise ValueError("symbols must contain at least one non-empty symbol")
         if len(set(self.symbols)) != len(self.symbols):
             raise ValueError("symbols must not contain duplicates")
+        if any(not isinstance(timeframe, str) for timeframe in self.timeframes):
+            raise ValueError("timeframes must contain only strings")
         if not self.timeframes or any(not timeframe.strip() for timeframe in self.timeframes):
             raise ValueError("timeframes must contain at least one non-empty timeframe")
         if len(set(self.timeframes)) != len(self.timeframes):
