@@ -1,4 +1,4 @@
-# Architecture — Phase 1
+# Architecture — Phase 2
 
 ## Scope
 
@@ -25,4 +25,27 @@ Each boundary has an explicit contract. Invalid or uncertain critical input fail
 
 ## Phase 1 boundary
 
-Phase 1 establishes the domain contracts and repository safety boundary. Market adapters, indicators, strategy rules, persistence, Telegram delivery, scheduling, and production deployment are intentionally deferred until their contracts are designed and gated.
+Phase 1 established the domain contracts and repository safety boundary. Its CI gate is required before advancing later phases.
+
+## Phase 2 — Point-in-Time Market Data Contract
+
+### Responsibilities
+
+- Define the request boundary for symbols, timeframes, and a fixed reference time.
+- Define an immutable market snapshot that can be consumed by deterministic strategy code.
+- Reject duplicate candles and duplicate request dimensions.
+- Reject candles that were not fully closed and available at the snapshot reference time.
+- Preserve deterministic candle ordering.
+- Keep source identity explicit without coupling the domain to a network/provider implementation.
+
+### Contract
+
+`SnapshotRequest` contains only explicit, UTC-normalized temporal input and unique symbol/timeframe dimensions.
+
+`MarketSnapshot` contains an explicit snapshot ID, source ID, UTC reference time, and an immutable tuple of validated candles.
+
+`MarketDataSource` is a protocol boundary. An implementation must return only data available at the requested reference time and must fail closed when that contract cannot be satisfied.
+
+### Non-goals
+
+Phase 2 does not yet select an exchange API, implement network retries, calculate indicators, fill missing historical data, or define trading strategy rules. Those require separate contracts and gates.
