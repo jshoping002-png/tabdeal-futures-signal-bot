@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 import pytest
 
@@ -43,7 +43,7 @@ def request() -> StrategyEvaluationRequest:
                 symbol="BTCUSDT",
                 timeframe="1h",
                 open_time=datetime(2026, 1, 1, tzinfo=UTC),
-                close_time=datetime(2026, 1, 1, tzinfo=UTC),
+                close_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
                 open=100.0,
                 high=110.0,
                 low=90.0,
