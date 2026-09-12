@@ -14,6 +14,8 @@ class SnapshotRequest:
     reference_time: datetime
 
     def __post_init__(self) -> None:
+        if not isinstance(self.symbols, tuple) or not isinstance(self.timeframes, tuple):
+            raise ValueError("symbols and timeframes must be tuples")
         if not self.symbols or any(not symbol.strip() for symbol in self.symbols):
             raise ValueError("symbols must contain at least one non-empty symbol")
         if len(set(self.symbols)) != len(self.symbols):
