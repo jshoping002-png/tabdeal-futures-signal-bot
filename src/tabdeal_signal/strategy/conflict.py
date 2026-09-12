@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from tabdeal_signal.domain.contracts import Direction, SideDecision
+from tabdeal_signal.domain.contracts import DecisionStatus, Direction, SideDecision
 
 
 class ConflictResolver(Protocol):
@@ -28,7 +28,10 @@ def apply_conflict_gate(
     if short_decision.direction is not Direction.SHORT:
         raise ValueError("short_decision must declare SHORT direction")
 
-    if long_decision.status.value != "SIGNAL" or short_decision.status.value != "SIGNAL":
+    if (
+        long_decision.status is not DecisionStatus.SIGNAL
+        or short_decision.status is not DecisionStatus.SIGNAL
+    ):
         return long_decision, short_decision
 
     return resolver.resolve(long_decision, short_decision)
