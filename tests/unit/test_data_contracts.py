@@ -47,3 +47,11 @@ def test_request_rejects_duplicate_symbols_and_timeframes() -> None:
         SnapshotRequest(("BTCUSDT", "BTCUSDT"), ("1h",), ref)
     with pytest.raises(ValueError, match="timeframes"):
         SnapshotRequest(("BTCUSDT",), ("1h", "1h"), ref)
+
+
+def test_request_rejects_mutable_collections() -> None:
+    ref = datetime(2026, 1, 1, tzinfo=UTC)
+    with pytest.raises(ValueError, match="tuples"):
+        SnapshotRequest(["BTCUSDT"], ("1h",), ref)  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="tuples"):
+        SnapshotRequest(("BTCUSDT",), ["1h"], ref)  # type: ignore[arg-type]
