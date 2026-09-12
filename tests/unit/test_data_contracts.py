@@ -71,6 +71,20 @@ def test_snapshot_rejects_non_string_source_id() -> None:
         MarketSnapshot("snap-1", 123, c.close_time + timedelta(microseconds=1), (c,))  # type: ignore[arg-type]
 
 
+def test_snapshot_filter_rejects_non_string_symbol() -> None:
+    c = candle(0)
+    snapshot = MarketSnapshot("snap-1", "source-a", c.close_time + timedelta(microseconds=1), (c,))
+    with pytest.raises(ValueError, match="symbol must be a string"):
+        snapshot.candles_for(123, "1h")  # type: ignore[arg-type]
+
+
+def test_snapshot_filter_rejects_non_string_timeframe() -> None:
+    c = candle(0)
+    snapshot = MarketSnapshot("snap-1", "source-a", c.close_time + timedelta(microseconds=1), (c,))
+    with pytest.raises(ValueError, match="timeframe must be a string"):
+        snapshot.candles_for("BTCUSDT", 60)  # type: ignore[arg-type]
+
+
 def test_request_rejects_duplicate_symbols_and_timeframes() -> None:
     ref = datetime(2026, 1, 1, tzinfo=UTC)
     with pytest.raises(ValueError, match="symbols"):
