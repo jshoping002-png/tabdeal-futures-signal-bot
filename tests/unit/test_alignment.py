@@ -42,3 +42,25 @@ def test_timeframe_mismatch_is_blocked() -> None:
     start = datetime(2026, 1, 1, tzinfo=UTC)
     one_hour = Candle("BTCUSDT", "1h", start, start + timedelta(hours=1), 100, 110, 90, 105, 1)
     assert validate_alignment((one_hour,), policy()) == ("CANDLE_BOUNDARY_MISMATCH",)
+
+
+def test_reason_order_is_independent_of_candle_input_order() -> None:
+    shifted = AlignmentPolicy(TimeframeSpec.parse("4h"), datetime(2026, 1, 1, 2, tzinfo=UTC))
+    aligned = candle(2)
+    mismatched_timeframe = Candle(
+        "BTCUSDT",
+        "1h",
+        datetime(2026, 1, 1, tzinfo=UTC),
+        datetime(2026, 1, 1, 1, tzinfo=UTC),
+        100,
+        110,
+        90,
+        105,
+        1,
+    )
+
+    forward = validate_alignment((aligned, mismatched_timeframe), shifted)
+    reverse = validate_alignment((mismatched_timeframe, aligned), shifted)
+
+    assert forward == ("CANDLE_BOUNDARY_MISMATCH",)
+    assert reverse == forward
