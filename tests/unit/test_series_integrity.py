@@ -60,14 +60,14 @@ def test_wrong_order_blocks_series() -> None:
 
 
 def test_snapshot_series_are_checked_independently() -> None:
-    ref = candle(2).close_time
+    ref = candle(2).close_time + timedelta(microseconds=1)
     snap = MarketSnapshot("snap-1", "source-a", ref, (candle(0), candle(1), candle(2)))
     report = validate_snapshot_series(snap, "1h")
     assert report.valid is True
 
 
 def test_snapshot_series_with_gap_blocks() -> None:
-    ref = candle(3).close_time
+    ref = candle(3).close_time + timedelta(microseconds=1)
     snap = MarketSnapshot("snap-1", "source-a", ref, (candle(0), candle(2), candle(3)))
     report = validate_snapshot_series(snap, "1h")
     assert report.valid is False

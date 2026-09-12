@@ -35,7 +35,7 @@ def test_snapshot_requires_deterministic_order() -> None:
 def test_snapshot_is_immutable_and_filters_without_mutation() -> None:
     first = candle(0)
     second = candle(1)
-    snapshot = MarketSnapshot("snap-1", "source-a", second.close_time, (first, second))
+    snapshot = MarketSnapshot("snap-1", "source-a", second.close_time + timedelta(microseconds=1), (first, second))
     assert snapshot.candles_for("BTCUSDT", "1h") == (first, second)
     with pytest.raises(AttributeError):
         snapshot.snapshot_id = "changed"  # type: ignore[misc]

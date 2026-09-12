@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -37,13 +37,13 @@ def request() -> StrategyEvaluationRequest:
     snapshot = MarketSnapshot(
         snapshot_id="snap-1",
         source_id="test-source",
-        reference_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
+        reference_time=datetime(2026, 1, 1, 1, 0, 0, 1, tzinfo=UTC),
         candles=(
             __import__("tabdeal_signal.domain.contracts", fromlist=["Candle"]).Candle(
                 symbol="BTCUSDT",
                 timeframe="1h",
                 open_time=datetime(2026, 1, 1, tzinfo=UTC),
-                close_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
+                close_time=datetime(2026, 1, 1, tzinfo=UTC),
                 open=100.0,
                 high=110.0,
                 low=90.0,
@@ -53,7 +53,7 @@ def request() -> StrategyEvaluationRequest:
         ),
     )
     context = DecisionContext(
-        decision_time=datetime(2026, 1, 1, 1, tzinfo=UTC),
+        decision_time=snapshot.reference_time,
         reference_time=snapshot.reference_time,
         snapshot_id=snapshot.snapshot_id,
         config_version="v1",
