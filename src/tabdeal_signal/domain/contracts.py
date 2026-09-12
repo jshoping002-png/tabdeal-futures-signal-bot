@@ -34,6 +34,8 @@ class Candle:
     def __post_init__(self) -> None:
         if not self.symbol.strip():
             raise ValueError("symbol must not be empty")
+        if not self.timeframe.strip():
+            raise ValueError("timeframe must not be empty")
         if self.close_time.tzinfo is None or self.open_time.tzinfo is None:
             raise ValueError("candle timestamps must be timezone-aware")
         if self.open_time.tzinfo != UTC or self.close_time.tzinfo != UTC:
@@ -46,6 +48,12 @@ class Candle:
             raise ValueError("low must not exceed high")
         if self.volume < 0:
             raise ValueError("volume must not be negative")
+
+    def is_available_at(self, reference_time: datetime) -> bool:
+        """Return True only when the candle was fully closed by reference_time."""
+        if reference_time.tzinfo is None or reference_time.tzinfo != UTC:
+            raise ValueError("reference_time must be UTC")
+        return self.close_time <= reference_time
 
 
 @dataclass(frozen=True, slots=True)
