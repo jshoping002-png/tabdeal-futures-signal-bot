@@ -103,6 +103,8 @@ class SignalDecision:
     def __post_init__(self) -> None:
         if not self.signal_id.strip():
             raise ValueError("signal_id is required")
+        if not isinstance(self.direction, Direction):
+            raise ValueError("direction must be a Direction")
         if self.created_at.tzinfo is None or self.created_at.tzinfo != UTC:
             raise ValueError("created_at must be UTC")
         if not self.snapshot_id.strip() or not self.config_version.strip():
