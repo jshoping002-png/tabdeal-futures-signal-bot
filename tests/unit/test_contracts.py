@@ -68,7 +68,7 @@ def test_candle_requires_string_timeframe():
 
 
 def test_candle_requires_numeric_open():
-    with pytest.raises(ValueError, match="open must be a number"):
+    with pytest.raises(ValueError, match="open must be numeric"):
         candle(open="100")  # type: ignore[arg-type]
 
 
