@@ -23,8 +23,8 @@ def decision() -> FinalDecision:
     return FinalDecision(DecisionStatus.BLOCKED, reason_code="NO_SIGNAL")
 
 
-def message(**overrides) -> OutboxMessage:
-    values = dict(
+def message(**overrides: object) -> OutboxMessage:
+    values: dict[str, object] = dict(
         event_id="event-1",
         idempotency_key="snapshot-1:decision-1",
         context=context(),
@@ -65,3 +65,13 @@ def test_outbox_message_rejects_naive_created_at() -> None:
 def test_outbox_message_accepts_delivered_status() -> None:
     item = message(status=OutboxStatus.DELIVERED)
     assert item.status is OutboxStatus.DELIVERED
+
+
+def test_outbox_message_rejects_invalid_created_at_type() -> None:
+    with pytest.raises(ValueError, match="created_at must be a datetime"):
+        message(created_at="2026-01-01T12:00:00Z")
+
+
+def test_outbox_message_rejects_invalid_status_type() -> None:
+    with pytest.raises(ValueError, match="status must be an OutboxStatus"):
+        message(status="PENDING")
