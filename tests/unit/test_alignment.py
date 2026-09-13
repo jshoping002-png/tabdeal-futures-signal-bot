@@ -43,6 +43,24 @@ def test_policy_requires_utc_anchor() -> None:
         raise AssertionError("non-UTC alignment anchor must be rejected")
 
 
+def test_policy_requires_datetime_anchor() -> None:
+    try:
+        AlignmentPolicy(TimeframeSpec.parse("4h"), "2026-01-01T00:00:00Z")
+    except ValueError as exc:
+        assert "datetime" in str(exc)
+    else:
+        raise AssertionError("non-datetime alignment anchor must be rejected")
+
+
+def test_policy_requires_timeframe_spec() -> None:
+    try:
+        AlignmentPolicy("4h", datetime(2026, 1, 1, tzinfo=UTC))
+    except ValueError as exc:
+        assert "TimeframeSpec" in str(exc)
+    else:
+        raise AssertionError("non-TimeframeSpec policy timeframe must be rejected")
+
+
 def test_timeframe_mismatch_is_blocked() -> None:
     start = datetime(2026, 1, 1, tzinfo=UTC)
     one_hour = Candle("BTCUSDT", "1h", start, start + timedelta(hours=1), 100, 110, 90, 105, 1)
