@@ -24,7 +24,8 @@ def _confirmed_swings(candles: tuple[Candle, ...], *, high: bool) -> tuple[Swing
             candle.high if high else candle.low
             for candle in (candles[index - 2], candles[index - 1], candles[index + 1], candles[index + 2])
         )
-        if value > max(neighbors):
+        is_swing = value > max(neighbors) if high else value < min(neighbors)
+        if is_swing:
             points.append(SwingPoint(index, value, candles[index + 2].close_time))
     return tuple(points)
 
