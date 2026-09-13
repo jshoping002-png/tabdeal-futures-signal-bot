@@ -55,6 +55,8 @@ class Candle:
             raise ValueError("low must be numeric")
         if not isinstance(self.close, (int, float)) or isinstance(self.close, bool):
             raise ValueError("close must be numeric")
+        if not isinstance(self.volume, (int, float)) or isinstance(self.volume, bool):
+            raise ValueError("volume must be numeric")
         if not all(isfinite(value) for value in (self.open, self.high, self.low, self.close, self.volume)):
             raise ValueError("candle numeric values must be finite")
         if self.high < max(self.open, self.close) or self.low > min(self.open, self.close):
