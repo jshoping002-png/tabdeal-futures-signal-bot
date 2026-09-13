@@ -1,7 +1,12 @@
 from datetime import datetime, timedelta, timezone
 
 from tabdeal_signal.domain.contracts import Candle, Direction
-from tabdeal_signal.strategy.engine import _break_events, _confirmed_swings, _trend
+from tabdeal_signal.strategy.engine import (
+    _break_events,
+    _confirmed_swings,
+    _latest_bos_and_choch,
+    _trend,
+)
 
 UTC = timezone.utc
 
@@ -117,3 +122,21 @@ def test_break_event_at_confirmation_boundary_is_not_lookahead_valid():
     reference_time = candles[-1].close_time + timedelta(minutes=1)
     events = _break_events(candles, reference_time)
     assert events == ()
+
+
+def test_latest_bos_and_choch_marks_opposite_break_as_choch():
+    candles = tuple(
+        make_candle(
+            i,
+            high=20.0 if i == 2 else 10.0,
+            low=0.0 if i == 6 else (-1.0 if i == 9 else 1.0),
+            close=21.0 if i == 5 else (-1.0 if i == 9 else 5.0),
+        )
+        for i in range(11)
+    )
+    reference_time = candles[-1].close_time + timedelta(minutes=1)
+
+    latest_bos, latest_choch = _latest_bos_and_choch(candles, reference_time)
+
+    assert latest_bos == (candles[9].close_time, Direction.SHORT)
+    assert latest_choch == (candles[9].close_time, Direction.SHORT)
