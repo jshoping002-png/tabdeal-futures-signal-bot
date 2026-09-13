@@ -23,6 +23,8 @@ class AlignmentPolicy:
             raise ValueError("anchor_time must be UTC")
 
     def contains(self, candle: Candle) -> bool:
+        if not isinstance(candle, Candle):
+            raise ValueError("candle must be a Candle")
         if candle.timeframe != self.timeframe.code:
             return False
         elapsed = candle.open_time - self.anchor_time
@@ -32,7 +34,16 @@ class AlignmentPolicy:
 
 
 def validate_alignment(candles: tuple[Candle, ...], policy: AlignmentPolicy) -> tuple[str, ...]:
-    """Return deterministic reason codes independent of candle iteration order."""
+    """Return deterministic alignment reason codes without inferring boundaries."""
+    if not isinstance(candles, tuple):
+        raise ValueError("candles must be a tuple")
+    if any(not isinstance(candle, Candle) for candle in candles):
+        raise ValueError("candles must contain Candle instances")
+    if not isinstance(policy, AlignmentPolicy):
+        raise ValueError("policy must be an AlignmentPolicy")
+    if not candles:
+        return ("EMPTY_SERIES",)
+
     has_non_utc_timestamp = False
     has_boundary_mismatch = False
 
