@@ -53,6 +53,19 @@ def test_no_signal_is_blocked() -> None:
     assert result == FinalDecision(DecisionStatus.BLOCKED, reason_code="NO_SIGNAL")
 
 
+def test_conflict_block_reason_survives_final_resolution() -> None:
+    result = resolve_final_decision(
+        long_decision=side(Direction.LONG, DecisionStatus.BLOCKED, "CONFLICT_BOTH_DIRECTIONS"),
+        short_decision=side(Direction.SHORT, DecisionStatus.BLOCKED, "CONFLICT_BOTH_DIRECTIONS"),
+        signal_id="signal-1",
+        created_at=CREATED,
+        snapshot_id="snapshot-1",
+        config_version="config-1",
+    )
+
+    assert result == FinalDecision(DecisionStatus.BLOCKED, reason_code="CONFLICT_BOTH_DIRECTIONS")
+
+
 def test_blocked_final_decision_cannot_carry_signal() -> None:
     with pytest.raises(ValueError, match="BLOCKED cannot contain"):
         FinalDecision(
