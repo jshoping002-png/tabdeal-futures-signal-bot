@@ -7,6 +7,7 @@ from typing import Protocol
 
 from tabdeal_signal.decision.final import FinalDecision
 from tabdeal_signal.domain.contracts import DecisionContext
+from tabdeal_signal.persistence.reliability import OutboxLease
 
 
 class OutboxStatus(str, Enum):
@@ -49,6 +50,6 @@ class OutboxRepository(Protocol):
         """Persist once; return False only when the same idempotency key already exists."""
         ...
 
-    def mark_delivered(self, event_id: str) -> None:
-        """Mark an existing message delivered without creating a duplicate event."""
+    def mark_delivered(self, event_id: str, lease: OutboxLease) -> None:
+        """Atomically mark delivered only when the exact lease still owns the event."""
         ...
