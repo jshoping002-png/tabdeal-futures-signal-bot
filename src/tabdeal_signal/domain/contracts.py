@@ -41,6 +41,8 @@ class Candle:
             raise ValueError("symbol must not be empty")
         if not self.timeframe.strip():
             raise ValueError("timeframe must not be empty")
+        if not isinstance(self.open_time, datetime):
+            raise ValueError("open_time must be a datetime")
         if self.close_time.tzinfo is None or self.open_time.tzinfo is None:
             raise ValueError("candle timestamps must be timezone-aware")
         if self.open_time.tzinfo != UTC or self.close_time.tzinfo != UTC:
