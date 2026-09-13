@@ -91,17 +91,17 @@ def test_in_memory_persistence_is_idempotent() -> None:
 def test_in_memory_persistence_rejects_idempotency_collision() -> None:
     store = InMemoryDecisionPersistence()
     store.persist(request())
-    different = PersistenceRequest(context=context(), decision=blocked_decision(), idempotency_key="snapshot-1:decision-1")
-    object.__setattr__(different, "idempotency_key", "snapshot-1:decision-1")
-    # The immutable request contents are identical here; a true collision is
-    # exercised by changing another field while preserving the same key.
     changed_context = DecisionContext(
         decision_time=datetime(2026, 1, 1, 12, 0, tzinfo=UTC),
         reference_time=datetime(2026, 1, 1, 11, 58, tzinfo=UTC),
         snapshot_id="snapshot-2",
         config_version="config-1",
     )
-    collision = PersistenceRequest(context=changed_context, decision=blocked_decision(), idempotency_key="snapshot-1:decision-1")
+    collision = PersistenceRequest(
+        context=changed_context,
+        decision=blocked_decision(),
+        idempotency_key="snapshot-1:decision-1",
+    )
     with pytest.raises(ValueError, match="idempotency key collision"):
         store.persist(collision)
 
