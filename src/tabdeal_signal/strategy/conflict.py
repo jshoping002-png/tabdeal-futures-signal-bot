@@ -16,6 +16,32 @@ class ConflictResolver(Protocol):
         ...
 
 
+class BlockOnConflictResolver:
+    """Deterministic fail-closed policy when both directions signal."""
+
+    def resolve(
+        self,
+        long_decision: SideDecision,
+        short_decision: SideDecision,
+    ) -> tuple[SideDecision, SideDecision]:
+        if long_decision.direction is not Direction.LONG:
+            raise ValueError("long_decision must declare LONG direction")
+        if short_decision.direction is not Direction.SHORT:
+            raise ValueError("short_decision must declare SHORT direction")
+        return (
+            SideDecision(
+                direction=Direction.LONG,
+                status=DecisionStatus.BLOCKED,
+                reason_code="CONFLICT_BOTH_DIRECTIONS",
+            ),
+            SideDecision(
+                direction=Direction.SHORT,
+                status=DecisionStatus.BLOCKED,
+                reason_code="CONFLICT_BOTH_DIRECTIONS",
+            ),
+        )
+
+
 def apply_conflict_gate(
     long_decision: SideDecision,
     short_decision: SideDecision,
