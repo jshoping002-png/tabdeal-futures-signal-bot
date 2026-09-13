@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tabdeal_signal.data.contracts import MarketSnapshot, SnapshotRequest
+from tabdeal_signal.data.contracts import MarketSnapshot, SnapshotRequest, validate_snapshot_request
 from tabdeal_signal.domain.contracts import Candle
 
 UTC = timezone.utc
@@ -111,3 +111,24 @@ def test_request_rejects_non_string_timeframe_members() -> None:
     ref = datetime(2026, 1, 1, tzinfo=UTC)
     with pytest.raises(ValueError, match="only strings"):
         SnapshotRequest(("BTCUSDT",), (60,), ref)  # type: ignore[arg-type]
+
+
+def test_snapshot_request_scope_accepts_matching_response() -> None:
+    reference = datetime(2026, 1, 1, 3, tzinfo=UTC)
+    request = SnapshotRequest(("BTCUSDT",), ("1h",), reference)
+    snapshot = MarketSnapshot("snap-1", "source-a", reference, (candle(1),))
+    assert validate_snapshot_request(request, snapshot) == ()
+
+
+def test_snapshot_request_scope_blocks_reference_time_mismatch() -> None:
+    reference = datetime(2026, 1, 1, 3, tzinfo=UTC)
+    request = SnapshotRequest(("BTCUSDT",), ("1h",), reference)
+    snapshot = MarketSnapshot("snap-1", "source-a", reference + timedelta(microseconds=1), (candle(1),))
+    assert validate_snapshot_request(request, snapshot) == ("REFERENCE_TIME_MISMATCH",)
+
+
+def test_snapshot_request_scope_blocks_unrequested_symbol_and_timeframe() -> None:
+    reference = datetime(2026, 1, 1, 3, tzinfo=UTC)
+    request = SnapshotRequest(("BTCUSDT",), ("1h",), reference)
+    snapshot = MarketSnapshot("snap-1", "source-a", reference, (candle(1, "ETHUSDT", "4h"),))
+    assert validate_snapshot_request(request, snapshot) == ("UNREQUESTED_SYMBOL", "UNREQUESTED_TIMEFRAME")
