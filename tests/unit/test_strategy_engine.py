@@ -128,7 +128,7 @@ def test_latest_bos_and_choch_separates_trend_bos_from_later_opposite_choch():
     candles = tuple(
         make_candle(
             i,
-            high=20.0 if i == 2 else 10.0,
+            high=21.0 if i == 5 else (20.0 if i == 2 else 10.0),
             low=0.0 if i == 6 else (-1.0 if i == 9 else 1.0),
             close=21.0 if i == 5 else (-1.0 if i == 9 else 5.0),
         )
