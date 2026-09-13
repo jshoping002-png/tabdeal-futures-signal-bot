@@ -87,3 +87,43 @@ def test_reason_order_is_independent_of_candle_input_order() -> None:
 
     assert forward == ("CANDLE_BOUNDARY_MISMATCH",)
     assert reverse == forward
+
+
+def test_empty_series_is_blocked() -> None:
+    assert validate_alignment((), policy()) == ("EMPTY_SERIES",)
+
+
+def test_alignment_requires_tuple_input() -> None:
+    try:
+        validate_alignment([candle(0)], policy())  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "tuple" in str(exc)
+    else:
+        raise AssertionError("non-tuple candle input must be rejected")
+
+
+def test_alignment_rejects_non_candle_members() -> None:
+    try:
+        validate_alignment((object(),), policy())  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "Candle" in str(exc)
+    else:
+        raise AssertionError("non-Candle members must be rejected")
+
+
+def test_alignment_requires_policy() -> None:
+    try:
+        validate_alignment((candle(0),), object())  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "AlignmentPolicy" in str(exc)
+    else:
+        raise AssertionError("non-policy input must be rejected")
+
+
+def test_policy_contains_requires_candle() -> None:
+    try:
+        policy().contains(object())  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "Candle" in str(exc)
+    else:
+        raise AssertionError("non-Candle input must be rejected")
