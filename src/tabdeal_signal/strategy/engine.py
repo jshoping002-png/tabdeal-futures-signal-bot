@@ -64,17 +64,18 @@ def _break_events(candles: tuple[Candle, ...], reference_time: datetime) -> tupl
     return tuple(events)
 
 
-def _latest_bos_and_choch(candles: tuple[Candle, ...], reference_time: datetime):
+def _latest_bos_and_choch(
+    candles: tuple[Candle, ...], reference_time: datetime, direction: Direction
+):
     events = _break_events(candles, reference_time)
-    if not events:
+    same_direction = tuple(event for event in events if event[1] is direction)
+    if not same_direction:
         return None, None
-    latest_bos = events[-1]
-    structure: Direction | None = None
-    latest_choch = None
-    for event in events:
-        if structure is not None and event[1] is not structure:
-            latest_choch = event
-        structure = event[1]
+    latest_bos = same_direction[-1]
+    later_opposite = tuple(
+        event for event in events if event[0] > latest_bos[0] and event[1] is not direction
+    )
+    latest_choch = later_opposite[-1] if later_opposite else None
     return latest_bos, latest_choch
 
 
@@ -108,10 +109,10 @@ class MultiTimeframeStrategyEvaluator(StrategyEvaluator):
             reason = "TREND_NEUTRAL" if trend is None else ("TREND_LONG_CONFIRMED" if trend is Direction.LONG else "TREND_SHORT_CONFIRMED")
             return StrategyEvaluation(self.direction, False, reason)
 
-        latest_bos, latest_choch = _latest_bos_and_choch(candles_1h, reference_time)
-        if latest_bos is None or latest_bos[1] is not self.direction:
+        latest_bos, latest_choch = _latest_bos_and_choch(candles_1h, reference_time, self.direction)
+        if latest_bos is None:
             return StrategyEvaluation(self.direction, False, "ENTRY_NOT_CONFIRMED")
-        if latest_choch is not None and latest_choch[0] > latest_bos[0] and latest_choch[1] is not self.direction:
+        if latest_choch is not None:
             reason = "STRUCTURE_CHOCH_LONG_INVALIDATED" if self.direction is Direction.LONG else "STRUCTURE_CHOCH_SHORT_INVALIDATED"
             return StrategyEvaluation(self.direction, False, reason)
 
