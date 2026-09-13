@@ -2,7 +2,7 @@
 
 ## Status
 
-DESIGNED — explicit signal-safety policy for Phase 9.
+APPROVED — explicit signal-safety policy for Phase 9.
 
 ## Objective
 
