@@ -77,6 +77,11 @@ def test_candle_requires_numeric_high():
         candle(high="110")  # type: ignore[arg-type]
 
 
+def test_candle_requires_numeric_close():
+    with pytest.raises(ValueError, match="close must be numeric"):
+        candle(close="105")  # type: ignore[arg-type]
+
+
 def test_future_reference_time_is_rejected():
     with pytest.raises(ValueError, match="after"):
         DecisionContext(decision_time=datetime(2026, 1, 1, tzinfo=UTC), reference_time=datetime(2026, 1, 1, 1, tzinfo=UTC), snapshot_id="s1", config_version="v1")
