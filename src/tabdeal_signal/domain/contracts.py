@@ -43,6 +43,8 @@ class Candle:
             raise ValueError("timeframe must not be empty")
         if not isinstance(self.open_time, datetime):
             raise ValueError("open_time must be a datetime")
+        if not isinstance(self.close_time, datetime):
+            raise ValueError("close_time must be a datetime")
         if self.close_time.tzinfo is None or self.open_time.tzinfo is None:
             raise ValueError("candle timestamps must be timezone-aware")
         if self.open_time.tzinfo != UTC or self.close_time.tzinfo != UTC:
@@ -70,6 +72,8 @@ class Candle:
 
     def is_available_at(self, reference_time: datetime) -> bool:
         """Return True only when the candle closed strictly before reference_time."""
+        if not isinstance(reference_time, datetime):
+            raise ValueError("reference_time must be a datetime")
         if reference_time.tzinfo is None or reference_time.tzinfo != UTC:
             raise ValueError("reference_time must be UTC")
         return self.close_time < reference_time
