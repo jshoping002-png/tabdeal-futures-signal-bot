@@ -81,6 +81,27 @@ class MarketSnapshot:
         )
 
 
+def validate_snapshot_request(request: SnapshotRequest, snapshot: MarketSnapshot) -> tuple[str, ...]:
+    """Validate that a source response stays inside the requested symbol/timeframe scope."""
+    if not isinstance(request, SnapshotRequest):
+        raise ValueError("request must be a SnapshotRequest")
+    if not isinstance(snapshot, MarketSnapshot):
+        raise ValueError("snapshot must be a MarketSnapshot")
+
+    reasons: list[str] = []
+    if snapshot.reference_time != request.reference_time:
+        reasons.append("REFERENCE_TIME_MISMATCH")
+
+    requested_symbols = set(request.symbols)
+    requested_timeframes = set(request.timeframes)
+    if any(candle.symbol not in requested_symbols for candle in snapshot.candles):
+        reasons.append("UNREQUESTED_SYMBOL")
+    if any(candle.timeframe not in requested_timeframes for candle in snapshot.candles):
+        reasons.append("UNREQUESTED_TIMEFRAME")
+
+    return tuple(reasons)
+
+
 class MarketDataSource(Protocol):
     """Point-in-time source contract; implementations must fail closed on invalid data."""
 
