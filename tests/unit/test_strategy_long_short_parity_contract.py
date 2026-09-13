@@ -23,11 +23,11 @@ def short_request():
     for i, high, low in ((4, 30.0, 15.0), (6, 24.0, 10.0), (9, 23.0, 8.0)):
         candles_4h[i] = make_candle("4h", candles_4h[i].open_time, timedelta(hours=4), high=high, low=low)
 
-    candles_1h = [make_candle("1h", BASE + timedelta(hours=48) + i * timedelta(hours=1), timedelta(hours=1)) for i in range(7)]
+    candles_1h = [make_candle("1h", BASE + timedelta(hours=48) + i * timedelta(hours=1), timedelta(hours=1), low=12.0) for i in range(7)]
     candles_1h[2] = make_candle("1h", candles_1h[2].open_time, timedelta(hours=1), high=20.0, low=10.0)
     candles_1h[5] = make_candle("1h", candles_1h[5].open_time, timedelta(hours=1), high=19.0, low=9.0, close=9.0)
 
-    candles_15m = [make_candle("15m", BASE + timedelta(hours=56) + i * timedelta(minutes=15), timedelta(minutes=15)) for i in range(7)]
+    candles_15m = [make_candle("15m", BASE + timedelta(hours=56) + i * timedelta(minutes=15), timedelta(minutes=15), low=12.0) for i in range(7)]
     candles_15m[2] = make_candle("15m", candles_15m[2].open_time, timedelta(minutes=15), high=20.0, low=10.0)
     candles_15m[5] = make_candle("15m", candles_15m[5].open_time, timedelta(minutes=15), high=19.0, low=9.0, close=9.0)
 
