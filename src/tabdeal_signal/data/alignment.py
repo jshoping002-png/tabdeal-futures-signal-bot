@@ -15,6 +15,10 @@ class AlignmentPolicy:
     anchor_time: datetime
 
     def __post_init__(self) -> None:
+        if not isinstance(self.timeframe, TimeframeSpec):
+            raise ValueError("timeframe must be a TimeframeSpec")
+        if not isinstance(self.anchor_time, datetime):
+            raise ValueError("anchor_time must be a datetime")
         if self.anchor_time.tzinfo is None or self.anchor_time.tzinfo != UTC:
             raise ValueError("anchor_time must be UTC")
 
