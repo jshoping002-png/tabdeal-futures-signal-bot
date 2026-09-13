@@ -94,8 +94,8 @@ def test_break_event_requires_close_strictly_below_confirmed_swing_low():
         make_candle(
             i,
             high=10.0,
-            low=5.0 if i == 2 else (3.0 if i == 5 else 10.0),
-            close=4.0 if i == 5 else 7.0,
+            low=0.5 if i == 2 else (0.3 if i == 5 else 1.0),
+            close=0.4 if i == 5 else 7.0,
         )
         for i in range(7)
     )
