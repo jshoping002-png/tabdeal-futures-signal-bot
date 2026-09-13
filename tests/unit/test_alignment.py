@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from tabdeal_signal.data.alignment import AlignmentPolicy, validate_alignment
+from tabdeal_signal.data.alignment import AlignmentPolicy, select_closed_candles, validate_alignment
 from tabdeal_signal.data.series import TimeframeSpec
 from tabdeal_signal.domain.contracts import Candle
 
@@ -127,3 +127,45 @@ def test_policy_contains_requires_candle() -> None:
         assert "Candle" in str(exc)
     else:
         raise AssertionError("non-Candle input must be rejected")
+
+
+def test_select_closed_candles_excludes_open_candle() -> None:
+    reference_time = datetime(2026, 1, 1, 12, tzinfo=UTC)
+    closed = candle(0)
+    open_candle = candle(8)
+
+    assert select_closed_candles((closed, open_candle), reference_time) == (closed,)
+
+
+def test_select_closed_candles_uses_strict_close_before_boundary() -> None:
+    reference_time = datetime(2026, 1, 1, 12, tzinfo=UTC)
+    boundary = candle(8)
+
+    assert boundary.close_time == reference_time
+    assert select_closed_candles((boundary,), reference_time) == ()
+
+
+def test_select_closed_candles_preserves_input_order() -> None:
+    reference_time = datetime(2026, 1, 1, 20, tzinfo=UTC)
+    later = candle(8)
+    earlier = candle(0)
+
+    assert select_closed_candles((later, earlier), reference_time) == (later, earlier)
+
+
+def test_select_closed_candles_requires_utc_reference_time() -> None:
+    try:
+        select_closed_candles((candle(0),), datetime(2026, 1, 1, 12))
+    except ValueError as exc:
+        assert "UTC" in str(exc)
+    else:
+        raise AssertionError("non-UTC reference time must be rejected")
+
+
+def test_select_closed_candles_requires_tuple_input() -> None:
+    try:
+        select_closed_candles([candle(0)], datetime(2026, 1, 1, 12, tzinfo=UTC))  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "tuple" in str(exc)
+    else:
+        raise AssertionError("non-tuple candle input must be rejected")
