@@ -1,5 +1,5 @@
 from tabdeal_signal.domain.contracts import DecisionStatus, Direction, SideDecision
-from tabdeal_signal.strategy.conflict import apply_conflict_gate
+from tabdeal_signal.strategy.conflict import BlockOnConflictResolver, apply_conflict_gate
 
 
 def decision(direction: Direction, status: DecisionStatus, reason: str) -> SideDecision:
@@ -48,6 +48,22 @@ def test_simultaneous_long_and_short_are_delegated_to_explicit_resolver():
     assert result_long.reason_code == "EXPLICIT_CONFLICT_POLICY"
     assert result_short.reason_code == "EXPLICIT_CONFLICT_POLICY"
     assert resolver.calls == 1
+
+
+def test_default_safe_resolver_blocks_both_directions():
+    resolver = BlockOnConflictResolver()
+    result_long, result_short = apply_conflict_gate(
+        decision(Direction.LONG, DecisionStatus.SIGNAL, "LONG_OK"),
+        decision(Direction.SHORT, DecisionStatus.SIGNAL, "SHORT_OK"),
+        resolver=resolver,
+    )
+
+    assert result_long == decision(
+        Direction.LONG, DecisionStatus.BLOCKED, "CONFLICT_BOTH_DIRECTIONS"
+    )
+    assert result_short == decision(
+        Direction.SHORT, DecisionStatus.BLOCKED, "CONFLICT_BOTH_DIRECTIONS"
+    )
 
 
 def test_wrong_direction_is_rejected():
