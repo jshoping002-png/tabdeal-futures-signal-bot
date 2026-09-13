@@ -40,7 +40,7 @@ def test_four_hour_higher_high_and_higher_low_confirm_long_trend():
         make_candle(
             i,
             high={2: 20.0, 6: 25.0}.get(i, 10.0),
-            low={4: 0.0, 8: -1.0}.get(i, 1.0),
+            low={4: 5.0, 8: 6.0}.get(i, 7.0),
         )
         for i in range(11)
     )
@@ -53,7 +53,7 @@ def test_four_hour_lower_high_and_lower_low_confirm_short_trend():
         make_candle(
             i,
             high={2: 20.0, 6: 15.0}.get(i, 10.0),
-            low={4: 0.0, 8: -1.0}.get(i, 1.0),
+            low={4: 6.0, 8: 5.0}.get(i, 7.0),
         )
         for i in range(11)
     )
@@ -66,7 +66,7 @@ def test_four_hour_mixed_structure_is_unresolved():
         make_candle(
             i,
             high={2: 20.0, 6: 25.0}.get(i, 10.0),
-            low={4: 0.0, 8: 2.0}.get(i, 1.0),
+            low={4: 5.0, 8: 8.0}.get(i, 7.0),
         )
         for i in range(11)
     )
@@ -80,7 +80,7 @@ def test_break_event_requires_close_strictly_beyond_confirmed_swing_high():
             i,
             high=20.0 if i == 2 else (21.0 if i == 5 else 10.0),
             low=1.0,
-            close=21.0 if i == 5 else (20.0 if i == 4 else 5.0),
+            close=21.0 if i == 5 else 5.0,
         )
         for i in range(7)
     )
@@ -94,8 +94,8 @@ def test_break_event_requires_close_strictly_below_confirmed_swing_low():
         make_candle(
             i,
             high=10.0,
-            low=0.0 if i == 2 else (-1.0 if i == 5 else 1.0),
-            close=-1.0 if i == 5 else (0.0 if i == 4 else 5.0),
+            low=5.0 if i == 2 else (3.0 if i == 5 else 10.0),
+            close=4.0 if i == 5 else 7.0,
         )
         for i in range(7)
     )
