@@ -140,3 +140,8 @@ def test_pipeline_blocks_when_neither_strategy_side_is_eligible() -> None:
     assert result == FinalDecision(DecisionStatus.BLOCKED, reason_code="NO_SIGNAL")
     assert long_risk.calls == 0
     assert short_risk.calls == 0
+def test_pipeline_is_deterministic_for_identical_inputs() -> None:
+    first, _, _ = run_pipeline(True, False)
+    second, _, _ = run_pipeline(True, False)
+
+    assert first == second
