@@ -48,6 +48,15 @@ def resolve_final_decision(
 
     if long_signal and short_signal:
         return FinalDecision(DecisionStatus.BLOCKED, reason_code="CONFLICT_BOTH_DIRECTIONS")
+
+    if (
+        not long_signal
+        and not short_signal
+        and long_decision.reason_code == "CONFLICT_BOTH_DIRECTIONS"
+        and short_decision.reason_code == "CONFLICT_BOTH_DIRECTIONS"
+    ):
+        return FinalDecision(DecisionStatus.BLOCKED, reason_code="CONFLICT_BOTH_DIRECTIONS")
+
     if not long_signal and not short_signal:
         return FinalDecision(DecisionStatus.BLOCKED, reason_code="NO_SIGNAL")
 
