@@ -124,7 +124,7 @@ def test_break_event_at_confirmation_boundary_is_not_lookahead_valid():
     assert events == ()
 
 
-def test_latest_bos_and_choch_marks_opposite_break_as_choch():
+def test_latest_bos_and_choch_separates_trend_bos_from_later_opposite_choch():
     candles = tuple(
         make_candle(
             i,
@@ -136,7 +136,7 @@ def test_latest_bos_and_choch_marks_opposite_break_as_choch():
     )
     reference_time = candles[-1].close_time + timedelta(minutes=1)
 
-    latest_bos, latest_choch = _latest_bos_and_choch(candles, reference_time)
+    latest_bos, latest_choch = _latest_bos_and_choch(candles, reference_time, Direction.LONG)
 
-    assert latest_bos == (candles[9].close_time, Direction.SHORT)
+    assert latest_bos == (candles[5].close_time, Direction.LONG)
     assert latest_choch == (candles[9].close_time, Direction.SHORT)
