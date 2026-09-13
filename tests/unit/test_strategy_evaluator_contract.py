@@ -75,18 +75,20 @@ def test_strategy_contract_accepts_4h_trend_1h_bos_then_15m_breakout():
 
 def test_strategy_contract_blocks_15m_breakout_that_precedes_1h_bos():
     candles = long_fixture()
-    candles = [
+    original_15m = [c for c in candles if c.timeframe == "15m"]
+    shifted_15m_start = BASE + timedelta(hours=8)
+    shifted_15m = [
         make_candle(
-            c.timeframe,
-            c.open_time - timedelta(hours=60),
+            "15m",
+            shifted_15m_start + i * timedelta(minutes=15),
             timedelta(minutes=15),
             high=c.high,
             low=c.low,
             close=c.close,
         )
-        if c.timeframe == "15m" else c
-        for c in candles
+        for i, c in enumerate(original_15m)
     ]
+    candles = [c for c in candles if c.timeframe != "15m"] + shifted_15m
     reference_time = max(c.close_time for c in candles) + timedelta(minutes=1)
     request = make_request(candles, reference_time)
 
@@ -99,20 +101,23 @@ def test_strategy_contract_blocks_15m_breakout_that_precedes_1h_bos():
 def test_strategy_contract_blocks_breakout_at_same_close_time_as_1h_bos():
     candles = long_fixture()
     bos_time = next(c.close_time for c in candles if c.timeframe == "1h" and c.close == 21.0)
+    original_15m = [c for c in candles if c.timeframe == "15m"]
+    breakout_index = next(i for i, c in enumerate(original_15m) if c.close == 21.0)
+    breakout_start = bos_time - timedelta(minutes=15)
     shifted_15m = [
         make_candle(
-            c.timeframe,
-            bos_time - timedelta(minutes=15) if c.timeframe == "15m" and c.close == 21.0 else c.open_time,
+            "15m",
+            breakout_start + (i - breakout_index) * timedelta(minutes=15),
             timedelta(minutes=15),
             high=c.high,
             low=c.low,
             close=c.close,
         )
-        if c.timeframe == "15m" and c.close == 21.0 else c
-        for c in candles
+        for i, c in enumerate(original_15m)
     ]
-    reference_time = max(c.close_time for c in shifted_15m) + timedelta(minutes=1)
-    request = make_request(shifted_15m, reference_time)
+    candles = [c for c in candles if c.timeframe != "15m"] + shifted_15m
+    reference_time = max(c.close_time for c in candles) + timedelta(minutes=1)
+    request = make_request(candles, reference_time)
 
     result = MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction=Direction.LONG).evaluate(request)
 
