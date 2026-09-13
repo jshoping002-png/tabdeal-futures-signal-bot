@@ -25,21 +25,29 @@ def make_candle(timeframe, start, duration, *, high=10.0, low=1.0, close=None):
     )
 
 
-def make_series(timeframe, count, start):
+def make_series(timeframe, count, start, *, high=10.0, low=1.0):
     durations = {"15m": timedelta(minutes=15), "1h": timedelta(hours=1), "4h": timedelta(hours=4)}
     duration = durations[timeframe]
-    return tuple(make_candle(timeframe, start + i * duration, duration) for i in range(count))
+    return tuple(
+        make_candle(timeframe, start + i * duration, duration, high=high, low=low)
+        for i in range(count)
+    )
 
 
 def make_request(candles, reference_time):
-    snapshot = MarketSnapshot("snapshot-v1", "test-source", reference_time, tuple(sorted(candles, key=lambda c: (c.symbol, c.timeframe, c.open_time))))
+    snapshot = MarketSnapshot(
+        "snapshot-v1",
+        "test-source",
+        reference_time,
+        tuple(sorted(candles, key=lambda c: (c.symbol, c.timeframe, c.open_time))),
+    )
     context = DecisionContext(reference_time, reference_time, snapshot.snapshot_id, "strategy-v1")
     return StrategyEvaluationRequest(context, snapshot)
 
 
 def long_fixture():
-    candles_4h = list(make_series("4h", 11, BASE))
-    for i, high, low in ((2, 20.0, 5.0), (4, 10.0, 1.0), (6, 25.0, 10.0), (8, 10.0, 6.0)):
+    candles_4h = list(make_series("4h", 11, BASE, low=7.0))
+    for i, high, low in ((2, 20.0, 7.0), (4, 10.0, 5.0), (6, 25.0, 7.0), (8, 10.0, 6.0)):
         candle = candles_4h[i]
         candles_4h[i] = make_candle("4h", candle.open_time, timedelta(hours=4), high=high, low=low)
 
@@ -68,7 +76,14 @@ def test_strategy_contract_accepts_4h_trend_1h_bos_then_15m_breakout():
 def test_strategy_contract_blocks_15m_breakout_that_precedes_1h_bos():
     candles = long_fixture()
     candles = [
-        make_candle(c.timeframe, c.open_time - timedelta(hours=60) if c.timeframe == "15m" else c.open_time, timedelta(minutes=15) if c.timeframe == "15m" else (timedelta(hours=1) if c.timeframe == "1h" else timedelta(hours=4)), high=c.high, low=c.low, close=c.close)
+        make_candle(
+            c.timeframe,
+            c.open_time - timedelta(hours=60),
+            timedelta(minutes=15),
+            high=c.high,
+            low=c.low,
+            close=c.close,
+        )
         if c.timeframe == "15m" else c
         for c in candles
     ]
