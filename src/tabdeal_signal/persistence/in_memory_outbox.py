@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from threading import Lock
+from threading import RLock
 
 from tabdeal_signal.persistence.outbox import OutboxMessage, OutboxRepository, OutboxStatus
 from tabdeal_signal.persistence.reliability import OutboxLease, OutboxLeaseRepository
@@ -11,7 +11,7 @@ class InMemoryOutboxRepository(OutboxRepository):
     """Reference outbox storage for deterministic tests; not production storage."""
 
     def __init__(self) -> None:
-        self._lock = Lock()
+        self._lock = RLock()
         self._messages: dict[str, OutboxMessage] = {}
         self._leases: dict[str, OutboxLease] = {}
         self._lease_sequence = 0
