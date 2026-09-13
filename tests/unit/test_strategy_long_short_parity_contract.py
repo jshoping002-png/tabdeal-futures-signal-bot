@@ -17,7 +17,7 @@ def make_candle(timeframe, start, duration, *, high=20.0, low=10.0, close=None):
 
 def short_request():
     candles_4h = [make_candle("4h", BASE + i * timedelta(hours=4), timedelta(hours=4), high=20.0, low=10.0) for i in range(11)]
-    for i, high, low in ((2, 20.0, 10.0), (4, 25.0, 12.0), (6, 15.0, 11.0), (8, 20.0, 8.0)):
+    for i, high, low in ((2, 20.0, 10.0), (4, 25.0, 12.0), (6, 15.0, 11.0), (8, 14.0, 8.0)):
         candles_4h[i] = make_candle("4h", candles_4h[i].open_time, timedelta(hours=4), high=high, low=low)
 
     candles_1h = [make_candle("1h", BASE + timedelta(hours=48) + i * timedelta(hours=1), timedelta(hours=1)) for i in range(7)]
