@@ -28,6 +28,16 @@ def test_persistence_request_requires_explicit_idempotency_key() -> None:
         PersistenceRequest(context=context(), decision=blocked_decision(), idempotency_key=" ")
 
 
+def test_persistence_request_rejects_invalid_context() -> None:
+    with pytest.raises(ValueError, match="context must be a DecisionContext"):
+        PersistenceRequest(context="invalid", decision=blocked_decision(), idempotency_key="key")
+
+
+def test_persistence_request_rejects_invalid_decision() -> None:
+    with pytest.raises(ValueError, match="decision must be a FinalDecision"):
+        PersistenceRequest(context=context(), decision="invalid", idempotency_key="key")
+
+
 def test_persistence_request_keeps_context_and_decision_together() -> None:
     request = PersistenceRequest(
         context=context(),
@@ -43,6 +53,16 @@ def test_persistence_request_keeps_context_and_decision_together() -> None:
 def test_persistence_result_rejects_non_persisted_replay() -> None:
     with pytest.raises(ValueError, match="idempotent replay must be persisted"):
         PersistenceResult(persisted=False, idempotent_replay=True)
+
+
+def test_persistence_result_rejects_non_boolean_persisted() -> None:
+    with pytest.raises(ValueError, match="persisted must be a bool"):
+        PersistenceResult(persisted="yes")
+
+
+def test_persistence_result_rejects_non_boolean_replay_flag() -> None:
+    with pytest.raises(ValueError, match="idempotent_replay must be a bool"):
+        PersistenceResult(persisted=True, idempotent_replay="yes")
 
 
 def test_persistence_result_accepts_new_persistence() -> None:
