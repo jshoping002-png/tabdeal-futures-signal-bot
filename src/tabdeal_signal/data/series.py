@@ -47,6 +47,12 @@ class SeriesIntegrityReport:
 
 def validate_candle_series(candles: tuple[Candle, ...], timeframe: str) -> SeriesIntegrityReport:
     """Validate duration, ordering, overlap, and continuity without clock/network access."""
+    if not isinstance(candles, tuple):
+        raise ValueError("candles must be a tuple")
+    if any(not isinstance(candle, Candle) for candle in candles):
+        raise ValueError("candles must contain Candle instances")
+    if not isinstance(timeframe, str):
+        raise ValueError("timeframe must be a string")
     if not candles:
         return SeriesIntegrityReport(False, ("EMPTY_SERIES",))
 
@@ -83,6 +89,10 @@ def validate_candle_series(candles: tuple[Candle, ...], timeframe: str) -> Serie
 
 def validate_snapshot_series(snapshot: MarketSnapshot, timeframe: str) -> SeriesIntegrityReport:
     """Validate every requested timeframe series independently; no LONG/SHORT semantics are involved."""
+    if not isinstance(snapshot, MarketSnapshot):
+        raise ValueError("snapshot must be a MarketSnapshot")
+    if not isinstance(timeframe, str):
+        raise ValueError("timeframe must be a string")
     try:
         TimeframeSpec.parse(timeframe)
     except ValueError:

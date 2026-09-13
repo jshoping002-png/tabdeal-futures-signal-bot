@@ -72,3 +72,50 @@ def test_snapshot_series_with_gap_blocks() -> None:
     report = validate_snapshot_series(snap, "1h")
     assert report.valid is False
     assert "CANDLE_GAP" in report.reason_codes
+
+
+def test_candle_series_requires_tuple_input() -> None:
+    try:
+        validate_candle_series([candle(0)], "1h")  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "tuple" in str(exc)
+    else:
+        raise AssertionError("non-tuple candle input must be rejected")
+
+
+def test_candle_series_rejects_non_candle_members() -> None:
+    try:
+        validate_candle_series((object(),), "1h")  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "Candle" in str(exc)
+    else:
+        raise AssertionError("non-Candle members must be rejected")
+
+
+def test_candle_series_requires_string_timeframe() -> None:
+    try:
+        validate_candle_series((candle(0),), object())  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "string" in str(exc)
+    else:
+        raise AssertionError("non-string timeframe must be rejected")
+
+
+def test_snapshot_series_requires_market_snapshot() -> None:
+    try:
+        validate_snapshot_series(object(), "1h")  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "MarketSnapshot" in str(exc)
+    else:
+        raise AssertionError("non-snapshot input must be rejected")
+
+
+def test_snapshot_series_requires_string_timeframe() -> None:
+    ref = candle(2).close_time + timedelta(microseconds=1)
+    snap = MarketSnapshot("snap-1", "source-a", ref, (candle(0), candle(1), candle(2)))
+    try:
+        validate_snapshot_series(snap, object())  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "string" in str(exc)
+    else:
+        raise AssertionError("non-string timeframe must be rejected")
