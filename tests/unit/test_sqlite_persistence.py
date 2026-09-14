@@ -89,18 +89,12 @@ def test_collision_is_rejected(tmp_path):
 def test_signal_creates_outbox(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
-        request = _request(
-            tmp_path,
-            status=DecisionStatus.SIGNAL,
-            key="signal-key",
-            event_id="event-123",
-        )
+        request = _request(tmp_path, status=DecisionStatus.SIGNAL, key="signal-key", event_id="event-123")
         db.persist(request)
         assert db._connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 1
         assert db._connection.execute("SELECT COUNT(*) FROM outbox").fetchone()[0] == 1
         row = db._connection.execute(
-            "SELECT event_id FROM outbox WHERE idempotency_key = ?",
-            ("signal-key",),
+            "SELECT event_id FROM outbox WHERE idempotency_key = ?", ("signal-key",)
         ).fetchone()
         assert row["event_id"] == "event-123"
     finally:
@@ -110,22 +104,14 @@ def test_signal_creates_outbox(tmp_path):
 def test_signal_without_event_id_uses_deterministic_fallback(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
-        request = _request(
-            tmp_path,
-            status=DecisionStatus.SIGNAL,
-            key="fallback-signal-key",
-        )
-
+        request = _request(tmp_path, status=DecisionStatus.SIGNAL, key="fallback-signal-key")
         first = db.persist(request)
         second = db.persist(request)
-
         assert first.persisted is True
         assert second.persisted is True
         assert second.idempotent_replay is True
-
         rows = db._connection.execute(
-            "SELECT event_id FROM outbox WHERE idempotency_key = ?",
-            ("fallback-signal-key",),
+            "SELECT event_id FROM outbox WHERE idempotency_key = ?", ("fallback-signal-key",)
         ).fetchall()
         assert len(rows) == 1
         assert rows[0]["event_id"] == "signal:fallback-signal-key"
@@ -136,33 +122,31 @@ def test_signal_without_event_id_uses_deterministic_fallback(tmp_path):
 def test_outbox_failure_rolls_back_decision(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
-        db.persist(
-            _request(
-                tmp_path,
-                status=DecisionStatus.SIGNAL,
-                key="first-signal",
-                event_id="shared-event",
-            )
-        )
-
+        db.persist(_request(tmp_path, status=DecisionStatus.SIGNAL, key="first-signal", event_id="shared-event"))
         with pytest.raises(PersistenceCollisionError):
-            db.persist(
-                _request(
-                    tmp_path,
-                    status=DecisionStatus.SIGNAL,
-                    key="second-signal",
-                    event_id="shared-event",
-                )
-            )
-
+            db.persist(_request(tmp_path, status=DecisionStatus.SIGNAL, key="second-signal", event_id="shared-event"))
         assert db._connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 1
         assert db._connection.execute("SELECT COUNT(*) FROM outbox").fetchone()[0] == 1
-        assert (
-            db._connection.execute(
-                "SELECT COUNT(*) FROM decisions WHERE idempotency_key = ?",
-                ("second-signal",),
-            ).fetchone()[0]
-            == 0
-        )
+        assert db._connection.execute(
+            "SELECT COUNT(*) FROM decisions WHERE idempotency_key = ?", ("second-signal",)
+        ).fetchone()[0] == 0
+    finally:
+        db.close()
+
+
+def test_quarantine_outbox_record_dead_letters_claimed_row(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(_request(tmp_path, status=DecisionStatus.SIGNAL, key="quarantine-key", event_id="quarantine-event"))
+        claimed = db.claim_pending_outbox(now="2026-01-01T00:00:00+00:00", lease_seconds=60, limit=1)
+        assert len(claimed) == 1
+        internal_id = claimed[0]["internal_id"]
+        db.quarantine_outbox_record(internal_id, "invalid event_id: missing or non-string")
+        row = db._connection.execute(
+            "SELECT status, last_error, locked_until FROM outbox WHERE rowid = ?", (internal_id,)
+        ).fetchone()
+        assert row["status"] == "DEAD_LETTER"
+        assert row["last_error"] == "invalid event_id: missing or non-string"
+        assert row["locked_until"] is None
     finally:
         db.close()
