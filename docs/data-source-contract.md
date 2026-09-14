@@ -49,6 +49,13 @@
 - کندل بسته‌نشده باید صریحاً علامت‌گذاری شود و نباید به‌صورت پیش‌فرض وارد featureهای نهایی شود.
 - timezone همهٔ timestampها باید مشخص و قابل تبدیل به UTC باشد.
 
+## قواعد immutability در قرارداد typed
+
+- metadata و provenance پس از ساخت نباید با انتساب مجدد فیلدها تغییر کنند.
+- `NormalizedSnapshot` نیز از نظر انتساب فیلدهای اصلی immutable است.
+- این immutability در سطح dataclass و انتساب فیلدهاست؛ immutable بودن عمیقِ objectهای تو‌در‌تو یا mappingهای mutable به‌صورت خودکار تضمین نمی‌شود.
+- در جاهایی که جلوگیری از تغییر داخلی لازم است، مصرف‌کننده باید mapping فقط‌خواندنی مانند `MappingProxyType` یا یک ساختار immutable صریح فراهم کند.
+
 ## قواعد provider
 
 هر adapter باید:
