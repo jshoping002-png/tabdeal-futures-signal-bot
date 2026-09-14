@@ -99,7 +99,7 @@ def test_strategy_evaluation_blocks_when_4h_trend_is_neutral():
                 candle_value.open_time,
                 candle_value.close_time,
                 candle_value.open,
-                10.0,
+                16.0,
                 candle_value.low,
                 candle_value.close,
                 candle_value.volume,
