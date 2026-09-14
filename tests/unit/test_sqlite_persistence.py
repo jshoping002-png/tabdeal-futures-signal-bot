@@ -105,3 +105,38 @@ def test_signal_creates_outbox(tmp_path):
         assert row["event_id"] == "event-123"
     finally:
         db.close()
+
+
+def test_outbox_failure_rolls_back_decision(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(
+            _request(
+                tmp_path,
+                status=DecisionStatus.SIGNAL,
+                key="first-signal",
+                event_id="shared-event",
+            )
+        )
+
+        with pytest.raises(PersistenceCollisionError):
+            db.persist(
+                _request(
+                    tmp_path,
+                    status=DecisionStatus.SIGNAL,
+                    key="second-signal",
+                    event_id="shared-event",
+                )
+            )
+
+        assert db._connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 1
+        assert db._connection.execute("SELECT COUNT(*) FROM outbox").fetchone()[0] == 1
+        assert (
+            db._connection.execute(
+                "SELECT COUNT(*) FROM decisions WHERE idempotency_key = ?",
+                ("second-signal",),
+            ).fetchone()[0]
+            == 0
+        )
+    finally:
+        db.close()
