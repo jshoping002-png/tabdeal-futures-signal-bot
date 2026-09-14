@@ -16,7 +16,7 @@ from tabdeal_signal.persistence.sqlite import (
 )
 
 
-def _request(tmp_path, status=DecisionStatus.BLOCKED, key="k-1"):
+def _request(tmp_path, status=DecisionStatus.BLOCKED, key="k-1", event_id=None):
     context = DecisionContext(
         decision_time=datetime(2026, 1, 1, tzinfo=timezone.utc),
         reference_time=datetime(2026, 1, 1, tzinfo=timezone.utc),
@@ -35,7 +35,12 @@ def _request(tmp_path, status=DecisionStatus.BLOCKED, key="k-1"):
         decision = FinalDecision(status=status, signal=signal)
     else:
         decision = FinalDecision(status=status, reason_code="TEST_BLOCK")
-    return PersistenceRequest(context=context, decision=decision, idempotency_key=key)
+    return PersistenceRequest(
+        context=context,
+        decision=decision,
+        idempotency_key=key,
+        event_id=event_id,
+    )
 
 
 def test_blocked_is_persisted_without_outbox(tmp_path):
@@ -84,9 +89,19 @@ def test_collision_is_rejected(tmp_path):
 def test_signal_creates_outbox(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
-        request = _request(tmp_path, status=DecisionStatus.SIGNAL, key="signal-key")
+        request = _request(
+            tmp_path,
+            status=DecisionStatus.SIGNAL,
+            key="signal-key",
+            event_id="event-123",
+        )
         db.persist(request)
         assert db._connection.execute("SELECT COUNT(*) FROM decisions").fetchone()[0] == 1
         assert db._connection.execute("SELECT COUNT(*) FROM outbox").fetchone()[0] == 1
+        row = db._connection.execute(
+            "SELECT event_id FROM outbox WHERE idempotency_key = ?",
+            ("signal-key",),
+        ).fetchone()
+        assert row["event_id"] == "event-123"
     finally:
         db.close()
