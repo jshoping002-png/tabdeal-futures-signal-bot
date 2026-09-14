@@ -115,3 +115,18 @@ def test_leverage_suffix_normalizes_case_and_whitespace() -> None:
     assert "⚡ Recommended leverage: 3X" in result
     assert "3XX" not in result
     assert "3Xx" not in result
+
+
+def test_formatter_does_not_mutate_signal_payload() -> None:
+    payload = {
+        "signal": {
+            "direction": "SHORT",
+            "recommended_leverage": " 3X ",
+            "take_profit_1": 1900,
+        }
+    }
+    original = {"signal": dict(payload["signal"])}
+
+    format_rich_signal_notification(payload)
+
+    assert payload == original
