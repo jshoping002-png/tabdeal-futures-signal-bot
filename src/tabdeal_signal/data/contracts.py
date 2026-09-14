@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from tabdeal_signal.domain.contracts import Candle, UTC
 
@@ -58,8 +58,6 @@ class MarketSnapshot:
             raise ValueError("reference_time must be a datetime")
         if self.reference_time.tzinfo is None or self.reference_time.tzinfo != UTC:
             raise ValueError("reference_time must be UTC")
-        if not self.candles:
-            raise ValueError("snapshot must contain at least one candle")
 
         keys = [(c.symbol, c.timeframe, c.open_time) for c in self.candles]
         if len(set(keys)) != len(keys):
@@ -74,11 +72,7 @@ class MarketSnapshot:
             raise ValueError("symbol must be a string")
         if not isinstance(timeframe, str):
             raise ValueError("timeframe must be a string")
-        return tuple(
-            candle
-            for candle in self.candles
-            if candle.symbol == symbol and candle.timeframe == timeframe
-        )
+        return tuple(candle for candle in self.candles if candle.symbol == symbol and candle.timeframe == timeframe)
 
 
 def validate_snapshot_request(request: SnapshotRequest, snapshot: MarketSnapshot) -> tuple[str, ...]:
@@ -102,6 +96,7 @@ def validate_snapshot_request(request: SnapshotRequest, snapshot: MarketSnapshot
     return tuple(reasons)
 
 
+@runtime_checkable
 class MarketDataSource(Protocol):
     """Point-in-time source contract; implementations must fail closed on invalid data."""
 
