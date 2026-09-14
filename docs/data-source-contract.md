@@ -57,6 +57,13 @@
 - این immutability در سطح dataclass و انتساب فیلدهاست؛ immutable بودن عمیقِ objectهای تو‌در‌تو یا mappingهای mutable به‌صورت خودکار تضمین نمی‌شود.
 - در جاهایی که جلوگیری از تغییر داخلی لازم است، مصرف‌کننده باید mapping فقط‌خواندنی مانند `MappingProxyType` یا یک ساختار immutable صریح فراهم کند.
 
+## قرارداد API منبع فقط‌خواندنی
+
+- متد اصلی provider باید `fetch_snapshot` باشد.
+- پارامتر اختیاری `as_of` باید **keyword-only** باشد تا فراخوانی‌های زمانی صریح و خوانا بمانند.
+- provider باید یک `NormalizedSnapshot` برگرداند و نباید state تصمیم‌گیری یا سفارش‌گذاری ایجاد کند.
+- هیچ متدی مانند `place_order`، `execute_trade` یا `cancel_order` نباید بخشی از این boundary باشد.
+
 ## قواعد provider
 
 هر adapter باید:
