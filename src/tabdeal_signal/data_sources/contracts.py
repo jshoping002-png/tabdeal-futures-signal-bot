@@ -33,6 +33,8 @@ Payload: TypeAlias = Mapping[str, object]
 
 
 def _require_aware(value: datetime, field_name: str) -> datetime:
+    if not isinstance(value, datetime):
+        raise ValueError(f"{field_name} must be a datetime")
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError(f"{field_name} must be timezone-aware")
     return value.astimezone(timezone.utc)
@@ -67,6 +69,10 @@ class DataSnapshotMetadata:
     provenance: DataProvenance | None = None
 
     def __post_init__(self) -> None:
+        if not isinstance(self.source_kind, SourceKind):
+            raise ValueError("source_kind must be a SourceKind")
+        if not isinstance(self.quality, DataQualityStatus):
+            raise ValueError("quality must be a DataQualityStatus")
         if not isinstance(self.instrument_or_topic, str) or not self.instrument_or_topic.strip():
             raise ValueError("instrument_or_topic must be a non-empty string")
         for name in (
@@ -90,6 +96,8 @@ class NormalizedSnapshot:
     values: Payload
 
     def __post_init__(self) -> None:
+        if not isinstance(self.metadata, DataSnapshotMetadata):
+            raise ValueError("metadata must be DataSnapshotMetadata")
         if not isinstance(self.values, Mapping):
             raise ValueError("values must be a mapping")
 
