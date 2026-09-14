@@ -35,7 +35,8 @@ def request():
     return StrategyEvaluationRequest(context, snapshot)
 
 
-def test_strategy_evaluation_is_deterministic_for_identical_snapshot_and_reference():def test_strategy_evaluation_does_not_use_post_reference_candles():
+    def test_strategy_evaluation_is_deterministic_for_identical_snapshot_and_reference():
+    def test_strategy_evaluation_does_not_use_post_reference_candles():
     request_value = request()
     reference_time = request_value.context.reference_time
 
