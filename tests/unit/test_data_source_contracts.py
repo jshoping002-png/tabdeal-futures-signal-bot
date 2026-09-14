@@ -41,6 +41,19 @@ def test_naive_timestamp_is_rejected() -> None:
         )
 
 
+def test_invalid_typed_metadata_fields_are_rejected() -> None:
+    with pytest.raises(ValueError, match="source_kind"):
+        DataSnapshotMetadata("exchange", "BTCUSDT", datetime(2026, 1, 1, tzinfo=timezone.utc))
+
+    with pytest.raises(ValueError, match="quality"):
+        DataSnapshotMetadata(
+            SourceKind.EXCHANGE,
+            "BTCUSDT",
+            datetime(2026, 1, 1, tzinfo=timezone.utc),
+            quality="VALID",
+        )
+
+
 def test_available_at_cannot_be_after_received_at() -> None:
     with pytest.raises(ValueError, match="available_at"):
         DataSnapshotMetadata(
@@ -49,6 +62,11 @@ def test_available_at_cannot_be_after_received_at() -> None:
             received_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
             available_at=datetime(2026, 1, 2, tzinfo=timezone.utc),
         )
+
+
+def test_snapshot_rejects_invalid_metadata_type() -> None:
+    with pytest.raises(ValueError, match="metadata"):
+        NormalizedSnapshot(metadata="invalid", values={"close": 100.0})
 
 
 def test_snapshot_is_immutable_and_quality_is_explicit() -> None:
