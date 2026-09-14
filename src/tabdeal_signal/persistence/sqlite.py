@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import asdict, is_dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -88,11 +88,8 @@ class SQLiteDecisionPersistence:
         }
         for name, definition in additions.items():
             if name not in existing:
-                default = "created_at" if name == "updated_at" else None
-                if default is not None:
-                    self._connection.execute(
-                        f"ALTER TABLE outbox ADD COLUMN {name} TEXT"
-                    )
+                if name == "updated_at":
+                    self._connection.execute("ALTER TABLE outbox ADD COLUMN updated_at TEXT")
                     self._connection.execute(
                         "UPDATE outbox SET updated_at = created_at WHERE updated_at IS NULL"
                     )
@@ -224,7 +221,8 @@ class SQLiteDecisionPersistence:
                 SET status = 'DEAD_LETTER', locked_until = NULL,
                     last_error = ?, updated_at = ?
                 WHERE event_id = ? AND status = 'PROCESSING'
-                """,
+                """
+                ,
                 (error, _utc_now(), event_id),
             )
             if cursor.rowcount != 1:
@@ -254,7 +252,7 @@ def _utc_now() -> str:
 
 def _plus_seconds(timestamp: str, seconds: int) -> str:
     value = datetime.fromisoformat(timestamp)
-    return (value + __import__("datetime").timedelta(seconds=seconds)).isoformat()
+    return (value + timedelta(seconds=seconds)).isoformat()
 
 
 def _event_id(request: PersistenceRequest) -> str:
