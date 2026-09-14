@@ -105,3 +105,13 @@ def test_leverage_suffix_is_not_duplicated() -> None:
 
     assert "⚡ Recommended leverage: 3x" in result
     assert "3xx" not in result
+
+
+def test_leverage_suffix_normalizes_case_and_whitespace() -> None:
+    result = format_rich_signal_notification(
+        {"signal": {"direction": "SHORT", "recommended_leverage": " 3X "}}
+    )
+
+    assert "⚡ Recommended leverage: 3X" in result
+    assert "3XX" not in result
+    assert "3Xx" not in result
