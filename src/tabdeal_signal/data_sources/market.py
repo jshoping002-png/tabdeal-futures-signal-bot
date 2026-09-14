@@ -28,14 +28,14 @@ class Candle:
             raise ValueError("candle timestamps must be timezone-aware")
         if self.opened_at >= self.closed_at:
             raise ValueError("opened_at must be earlier than closed_at")
-        if self.high < max(self.open, self.close, self.low):
-            raise ValueError("high must be at least open, close, and low")
-        if self.low > min(self.open, self.close, self.high):
-            raise ValueError("low must be at most open, close, and high")
         if self.volume < 0:
             raise ValueError("volume must be non-negative")
         if any(value < 0 for value in (self.open, self.high, self.low, self.close)):
             raise ValueError("prices must be non-negative")
+        if self.high < max(self.open, self.close, self.low):
+            raise ValueError("high must be at least open, close, and low")
+        if self.low > min(self.open, self.close, self.high):
+            raise ValueError("low must be at most open, close, and high")
 
 
 __all__ = ["Candle"]
