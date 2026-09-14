@@ -99,6 +99,18 @@ def test_snapshot_accepts_mapping_values() -> None:
     assert snapshot.values["volume"] == 12.5
 
 
+def test_provenance_is_immutable() -> None:
+    provenance = DataProvenance("test", "fixture://btc", "1")
+    with pytest.raises((AttributeError, TypeError)):
+        provenance.source = "changed"
+
+
+def test_metadata_is_immutable() -> None:
+    metadata = _metadata()
+    with pytest.raises((AttributeError, TypeError)):
+        metadata.quality = DataQualityStatus.STALE
+
+
 def test_snapshot_is_immutable_and_quality_is_explicit() -> None:
     snapshot = NormalizedSnapshot(_metadata(), {"close": 100.0})
     assert snapshot.metadata.quality is DataQualityStatus.VALID
