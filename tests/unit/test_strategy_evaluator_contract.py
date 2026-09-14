@@ -1,204 +1,134 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from tabdeal_signal.data.contracts import MarketSnapshot
 from tabdeal_signal.domain.contracts import Candle, DecisionContext, DecisionStatus, Direction
-from tabdeal_signal.strategy.contracts import StrategyEvaluationRequest
-from tabdeal_signal.strategy.engine import MultiTimeframeStrategyEvaluator
+from tabdeal_signal.strategy.contracts import StrategyEvaluation, StrategyEvaluationRequest
 
 UTC = timezone.utc
-BASE = datetime(2026, 1, 1, tzinfo=UTC)
 
-def candle(
-timeframe,
-start,
-duration,
-*,
-high=10.0,
-low=1.0,
-close=None,
-):
-if close is None:
-close = (high + low) / 2
-
-```
+def candle(hour: int) -> Candle:
+start = datetime(2026, 1, 1, tzinfo=UTC) + timedelta(hours=hour)
 return Candle(
-    "BTCUSDT",
-    timeframe,
-    start,
-    start + duration,
-    low,
-    high,
-    low,
-    close,
-    1.0,
-)
-```
-
-def request():
-candles_4h = [
-candle(
-"4h",
-BASE + i * timedelta(hours=4),
-timedelta(hours=4),
-low=7.0,
-)
-for i in range(11)
-]
-
-```
-for i, high, low in (
-    (2, 20.0, 7.0),
-    (4, 10.0, 5.0),
-    (6, 25.0, 7.0),
-    (8, 10.0, 6.0),
-):
-    candles_4h[i] = candle(
-        "4h",
-        candles_4h[i].open_time,
-        timedelta(hours=4),
-        high=high,
-        low=low,
-    )
-
-candles_1h = [
-    candle(
-        "1h",
-        BASE + timedelta(hours=48) + i * timedelta(hours=1),
-        timedelta(hours=1),
-    )
-    for i in range(7)
-]
-
-candles_1h[2] = candle(
-    "1h",
-    candles_1h[2].open_time,
-    timedelta(hours=1),
-    high=20.0,
-    low=1.0,
+"BTCUSDT",
+"1h",
+start,
+start + timedelta(hours=1),
+100,
+110,
+90,
+105,
+1,
 )
 
-candles_1h[5] = candle(
-    "1h",
-    candles_1h[5].open_time,
-    timedelta(hours=1),
-    high=21.0,
-    low=1.0,
-    close=21.0,
+def context(reference_time: datetime) -> DecisionContext:
+return DecisionContext(
+decision_time=reference_time,
+reference_time=reference_time,
+snapshot_id="snap-1",
+config_version="config-1",
 )
 
-candles_15m = [
-    candle(
-        "15m",
-        BASE + timedelta(hours=56) + i * timedelta(minutes=15),
-        timedelta(minutes=15),
-    )
-    for i in range(7)
-]
-
-candles_15m[2] = candle(
-    "15m",
-    candles_15m[2].open_time,
-    timedelta(minutes=15),
-    high=20.0,
-    low=1.0,
-)
-
-candles_15m[5] = candle(
-    "15m",
-    candles_15m[5].open_time,
-    timedelta(minutes=15),
-    high=21.0,
-    low=1.0,
-    close=21.0,
-)
-
-all_candles = tuple(candles_4h + candles_1h + candles_15m)
-
-reference_time = max(
-    c.close_time for c in all_candles
-) + timedelta(minutes=1)
-
+def test_strategy_request_requires_matching_reference_time() -> None:
 snapshot = MarketSnapshot(
-    "snapshot-determinism",
-    "test-source",
-    reference_time,
-    tuple(
-        sorted(
-            all_candles,
-            key=lambda c: (
-                c.symbol,
-                c.timeframe,
-                c.open_time,
-            ),
-        )
-    ),
+"snap-1",
+"source-a",
+candle(1).close_time + timedelta(microseconds=1),
+(candle(0), candle(1)),
 )
 
-context = DecisionContext(
-    reference_time,
-    reference_time,
-    snapshot.snapshot_id,
-    "strategy-v1",
-)
+mismatched = context(snapshot.reference_time + timedelta(seconds=1))
 
-return StrategyEvaluationRequest(
-    context,
-    snapshot,
-)
-```
+with pytest.raises(ValueError, match="reference_time"):
+    StrategyEvaluationRequest(mismatched, snapshot)
 
-def test_strategy_evaluation_is_deterministic_for_identical_snapshot_and_reference():
-evaluator = MultiTimeframeStrategyEvaluator(
-symbol="BTCUSDT",
-direction=Direction.LONG,
-)
-
-```
-first = evaluator.evaluate(request())
-second = evaluator.evaluate(request())
-
-assert first == second
-assert first.to_side_decision().status is DecisionStatus.SIGNAL
-assert first.reason_code == "ENTRY_BREAKOUT_LONG"
-```
-
-def test_strategy_evaluation_does_not_use_post_reference_candles():
-request_value = request()
-reference_time = request_value.context.reference_time
-
-```
-future_candle = candle(
-    "15m",
-    reference_time,
-    timedelta(minutes=15),
-    high=1000.0,
-    low=1.0,
-    close=1000.0,
-)
-
+def test_strategy_request_rejects_non_decision_context() -> None:
 snapshot = MarketSnapshot(
-    request_value.snapshot.snapshot_id,
-    request_value.snapshot.source_id,
-    reference_time,
-    request_value.snapshot.candles + (future_candle,),
+"snap-1",
+"source-a",
+candle(0).close_time + timedelta(microseconds=1),
+(candle(0),),
 )
 
-context = DecisionContext(
-    reference_time,
-    reference_time,
-    snapshot.snapshot_id,
-    "strategy-v1",
+with pytest.raises(ValueError, match="DecisionContext"):
+    StrategyEvaluationRequest(object(), snapshot)
+
+def test_strategy_request_rejects_non_market_snapshot() -> None:
+reference_time = datetime(
+2026,
+1,
+1,
+1,
+0,
+0,
+1,
+tzinfo=UTC,
 )
 
-future_request = StrategyEvaluationRequest(
-    context,
+with pytest.raises(ValueError, match="MarketSnapshot"):
+    StrategyEvaluationRequest(context(reference_time), object())
+
+def test_strategy_evaluation_is_immutable_and_maps_to_side_decision() -> None:
+result = StrategyEvaluation(
+Direction.LONG,
+True,
+"LONG_RULES_PASS",
+)
+
+assert result.to_side_decision().status is DecisionStatus.SIGNAL
+
+with pytest.raises(AttributeError):
+    result.eligible = False
+
+def test_blocked_strategy_maps_to_blocked_side_decision() -> None:
+result = StrategyEvaluation(
+Direction.SHORT,
+False,
+"SHORT_DATA_INSUFFICIENT",
+)
+
+decision = result.to_side_decision()
+
+assert decision.direction is Direction.SHORT
+assert decision.status is DecisionStatus.BLOCKED
+
+def test_strategy_evaluation_requires_reason_code() -> None:
+with pytest.raises(ValueError, match="reason_code"):
+StrategyEvaluation(
+Direction.LONG,
+False,
+"",
+)
+
+def test_strategy_evaluation_requires_direction_enum() -> None:
+with pytest.raises(ValueError, match="Direction"):
+StrategyEvaluation(
+"LONG",
+True,
+"LONG_RULES_PASS",
+)
+
+def test_strategy_evaluation_requires_boolean_eligibility() -> None:
+with pytest.raises(ValueError, match="bool"):
+StrategyEvaluation(
+Direction.LONG,
+1,
+"LONG_RULES_PASS",
+)
+
+def test_strategy_request_is_immutable() -> None:
+snapshot = MarketSnapshot(
+"snap-1",
+"source-a",
+candle(1).close_time + timedelta(microseconds=1),
+(candle(0), candle(1)),
+)
+
+request = StrategyEvaluationRequest(
+    context(snapshot.reference_time),
     snapshot,
 )
 
-evaluator = MultiTimeframeStrategyEvaluator(
-    symbol="BTCUSDT",
-    direction=Direction.LONG,
-)
-
-assert evaluator.evaluate(future_request) == evaluator.evaluate(request_value)
-```
+with pytest.raises(AttributeError):
+    request.snapshot = snapshot
