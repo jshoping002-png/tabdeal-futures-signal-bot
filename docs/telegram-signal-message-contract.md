@@ -42,6 +42,8 @@ Every signal message should include:
 - Leveraged return is an estimate based on the unleveraged return multiplied by the suggested leverage.
 - Fees, funding, slippage, liquidation distance, and execution differences must be disclosed or accounted for when supported by the data.
 - If a value is unavailable, the message must use an explicit unavailable marker rather than inventing a number.
+- The current text formatter only renders supplied estimates; it does not calculate, infer, or rewrite entry, stop-loss, or take-profit levels.
+- Leverage values already expressed with an `x` suffix must not receive a second suffix.
 
 ## Safety boundary
 
