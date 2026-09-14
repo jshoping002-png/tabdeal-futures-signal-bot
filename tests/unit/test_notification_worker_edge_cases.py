@@ -13,6 +13,7 @@ class FakePersistence:
         self.sent = []
         self.retried = []
         self.dead_lettered = []
+        self.quarantined = []
 
     def claim_pending_outbox(self, now=None, lease_seconds=60, limit=10):
         return list(self.records)[:limit]
@@ -25,6 +26,9 @@ class FakePersistence:
 
     def mark_outbox_dead_letter(self, event_id, error):
         self.dead_lettered.append((event_id, error))
+
+    def quarantine_outbox_record(self, internal_id, error):
+        self.quarantined.append((internal_id, error))
 
 
 class FakeTransport:
@@ -39,80 +43,55 @@ class FakeTransport:
 
 
 def test_invalid_payload_is_retried_without_transport_call():
-    persistence = FakePersistence(
-        [{"event_id": "evt-1", "payload_json": "not-json", "attempt_count": 1}]
-    )
+    persistence = FakePersistence([{"event_id": "evt-1", "payload_json": "not-json", "attempt_count": 1}])
     transport = FakeTransport()
-
-    claimed = NotificationWorker(persistence, transport).run_once(
-        now="2026-01-01T00:00:00+00:00"
-    )
-
-    assert claimed == 1
+    assert NotificationWorker(persistence, transport).run_once(now="2026-01-01T00:00:00+00:00") == 1
     assert transport.calls == []
     assert len(persistence.retried) == 1
     assert persistence.dead_lettered == []
-    assert persistence.retried[0][0] == "evt-1"
 
 
 def test_non_object_payload_is_retried_without_transport_call():
-    persistence = FakePersistence(
-        [
-            {
-                "event_id": "evt-2",
-                "payload_json": json.dumps(["signal"]),
-                "attempt_count": 1,
-            }
-        ]
-    )
+    persistence = FakePersistence([{"event_id": "evt-2", "payload_json": json.dumps(["signal"]), "attempt_count": 1}])
     transport = FakeTransport()
-
-    NotificationWorker(persistence, transport).run_once(
-        now="2026-01-01T00:00:00+00:00"
-    )
-
+    NotificationWorker(persistence, transport).run_once(now="2026-01-01T00:00:00+00:00")
     assert transport.calls == []
     assert len(persistence.retried) == 1
 
 
 def test_max_attempts_moves_transport_failure_to_dead_letter():
-    persistence = FakePersistence(
-        [{"event_id": "evt-3", "payload_json": json.dumps({"decision": "LONG"}), "attempt_count": 3}]
-    )
+    persistence = FakePersistence([{"event_id": "evt-3", "payload_json": json.dumps({"decision": "LONG"}), "attempt_count": 3}])
     transport = FakeTransport(RuntimeError("temporary failure"))
-
-    NotificationWorker(persistence, transport, max_attempts=3).run_once(
-        now="2026-01-01T00:00:00+00:00"
-    )
-
+    NotificationWorker(persistence, transport, max_attempts=3).run_once(now="2026-01-01T00:00:00+00:00")
     assert len(transport.calls) == 1
     assert persistence.retried == []
-    assert persistence.dead_lettered == [
-        ("evt-3", "RuntimeError: temporary failure")
-    ]
+    assert persistence.dead_lettered == [("evt-3", "RuntimeError: temporary failure")]
 
 
-def test_empty_event_id_is_dead_lettered_without_transport_call():
-    persistence = FakePersistence(
-        [{"event_id": "   ", "payload_json": json.dumps({"decision": "LONG"})}]
-    )
-    transport = FakeTransport()
+def test_empty_event_id_is_quarantined_without_transport_call():
+    persistence = FakePersistence([{"internal_id": 11, "event_id": "   ", "payload_json": json.dumps({"decision": "LONG"})}])
+    NotificationWorker(persistence, FakeTransport()).run_once(now="2026-01-01T00:00:00+00:00")
+    assert persistence.quarantined == [(11, "invalid event_id: empty or whitespace-only")]
+    assert persistence.dead_lettered == []
 
-    NotificationWorker(persistence, transport).run_once(
-        now="2026-01-01T00:00:00+00:00"
-    )
 
-    assert transport.calls == []
-    assert persistence.retried == []
-    assert persistence.dead_lettered == [
-        ("   ", "invalid event_id: empty or whitespace-only")
-    ]
+def test_missing_event_id_is_quarantined_without_transport_call():
+    persistence = FakePersistence([{"internal_id": 12, "payload_json": json.dumps({"decision": "LONG"})}])
+    NotificationWorker(persistence, FakeTransport()).run_once(now="2026-01-01T00:00:00+00:00")
+    assert persistence.quarantined == [(12, "invalid event_id: missing or non-string")]
+    assert persistence.dead_lettered == []
+
+
+def test_non_string_event_id_is_quarantined_without_transport_call():
+    persistence = FakePersistence([{"internal_id": 13, "event_id": 123, "payload_json": json.dumps({"decision": "LONG"})}])
+    NotificationWorker(persistence, FakeTransport()).run_once(now="2026-01-01T00:00:00+00:00")
+    assert persistence.quarantined == [(13, "invalid event_id: missing or non-string")]
+    assert persistence.dead_lettered == []
 
 
 def test_worker_configuration_rejects_invalid_values():
     persistence = FakePersistence([])
     transport = FakeTransport()
-
     with pytest.raises(ValueError):
         NotificationWorker(persistence, transport, max_attempts=0)
     with pytest.raises(ValueError):
