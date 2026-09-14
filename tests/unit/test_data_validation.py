@@ -86,3 +86,44 @@ def test_validation_report_is_immutable() -> None:
 def test_infinity_is_rejected_at_candle_boundary() -> None:
     with pytest.raises(ValueError, match="finite"):
         Candle("BTCUSDT", "1h", candle(0).open_time, candle(0).close_time, 100, inf, 90, 105, 1)
+
+
+def test_validation_rejects_wrong_request_type() -> None:
+    ref = candle(1).close_time
+    with pytest.raises(ValueError, match="SnapshotRequest"):
+        validate_snapshot(object(), snapshot(ref, candle(0)))  # type: ignore[arg-type]
+
+
+def test_validation_rejects_wrong_snapshot_type() -> None:
+    ref = candle(1).close_time
+    with pytest.raises(ValueError, match="MarketSnapshot"):
+        validate_snapshot(request(ref), object())  # type: ignore[arg-type]
+
+
+def test_validation_issue_and_report_types_are_explicit() -> None:
+    from tabdeal_signal.data.validation import ValidationIssue, ValidationReport
+
+    with pytest.raises(ValueError, match="strings"):
+        ValidationIssue(1, "detail")  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="bool"):
+        ValidationReport(1, ())  # type: ignore[arg-type]
+    with pytest.raises(ValueError, match="tuple"):
+        ValidationReport(True, [])  # type: ignore[arg-type]
+
+
+def test_validation_issue_order_is_deterministic() -> None:
+    ref = candle(1).close_time
+    req = SnapshotRequest(("BTCUSDT", "ETHUSDT"), ("1h", "4h"), ref)
+    snap = MarketSnapshot(
+        "snap-1",
+        "source-a",
+        ref,
+        (
+            candle(0),
+            Candle("ETHUSDT", "1h", candle(0).open_time, candle(0).close_time, 100, 110, 90, 105, 1),
+        ),
+    )
+    first = validate_snapshot(req, snap)
+    second = validate_snapshot(req, snap)
+    assert first == second
+    assert [issue.code for issue in first.issues] == ["MISSING_DATA", "MISSING_DATA"]
