@@ -154,7 +154,46 @@ class MultiTimeframeStrategyEvaluator(StrategyEvaluator):
     evaluator = MultiTimeframeStrategyEvaluator(
         symbol="BTCUSDT",
         direction=Direction.LONG,
+    )def test_strategy_evaluator_requires_complete_multi_timeframe_context():
+    from tabdeal_signal.data.contracts import MarketSnapshot
+    from tabdeal_signal.domain.contracts import DecisionContext
+    from tabdeal_signal.strategy.contracts import StrategyEvaluationRequest
+
+    reference_time = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
+
+    candles = (
+        make_candle(0),
+        make_candle(1),
+        make_candle(2),
+        make_candle(3),
+        make_candle(4),
     )
+
+    snapshot = MarketSnapshot(
+        "strategy-test",
+        "test-source",
+        reference_time,
+        candles,
+    )
+
+    context = DecisionContext(
+        decision_time=reference_time,
+        reference_time=reference_time,
+        snapshot_id=snapshot.snapshot_id,
+        config_version="config-1",
+    )
+
+    request = StrategyEvaluationRequest(context, snapshot)
+
+    evaluator = MultiTimeframeStrategyEvaluator(
+        symbol="BTCUSDT",
+        direction=Direction.LONG,
+    )
+
+    result = evaluator.evaluate(request)
+
+    assert result.eligible is False
+    assert result.reason_code == "INSUFFICIENT_SWING_CONTEXT"
 
     result = evaluator.evaluate(request)
 
