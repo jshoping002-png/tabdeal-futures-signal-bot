@@ -83,3 +83,16 @@ def test_unknown_direction_does_not_emit_trade_direction_marker() -> None:
     assert "⚪ NEUTRAL" in result
     assert "🟢 LONG — BUY" not in result
     assert "🔴 SHORT — SELL" not in result
+
+
+def test_formatter_does_not_leak_transport_secrets() -> None:
+    result = format_rich_signal_notification(
+        {
+            "signal": {"symbol": "BTCUSDT", "direction": "LONG"},
+            "bot_token": "super-secret-token",
+            "chat_id": "private-chat-id",
+        }
+    )
+
+    assert "super-secret-token" not in result
+    assert "private-chat-id" not in result
