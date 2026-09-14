@@ -45,6 +45,9 @@ def test_long_signal_uses_long_markers_without_rewriting_levels() -> None:
     assert "TP1: 2100" in result
     assert "TP2: 2200" in result
     assert "TP3: 2300" in result
+    assert "TP1: N/A" not in result
+    assert "TP2: N/A" not in result
+    assert "TP3: N/A" not in result
 
 
 def test_short_signal_uses_short_markers_without_rewriting_levels() -> None:
@@ -69,3 +72,14 @@ def test_short_signal_uses_short_markers_without_rewriting_levels() -> None:
     assert "TP1: 1900" in result
     assert "TP2: 1800" in result
     assert "TP3: 1700" in result
+    assert "TP1: N/A" not in result
+    assert "TP2: N/A" not in result
+    assert "TP3: N/A" not in result
+
+
+def test_unknown_direction_does_not_emit_trade_direction_marker() -> None:
+    result = format_rich_signal_notification({"signal": {"direction": "NEUTRAL"}})
+
+    assert "⚪ NEUTRAL" in result
+    assert "🟢 LONG — BUY" not in result
+    assert "🔴 SHORT — SELL" not in result
