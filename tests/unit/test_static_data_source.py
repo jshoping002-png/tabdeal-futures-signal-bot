@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
 from types import MappingProxyType
 
+import pytest
+
 from tabdeal_signal.data_sources.contracts import (
-    DataSnapshotMetadata,
     DataQualityStatus,
+    DataSnapshotMetadata,
     NormalizedSnapshot,
     SourceKind,
 )
@@ -40,3 +42,12 @@ def test_static_data_source_copies_fixture_values() -> None:
 
     assert source.fetch_snapshot().values == {"close": 100.0, "volume": 12.5}
     assert isinstance(source.fetch_snapshot().values, MappingProxyType)
+
+
+def test_static_data_source_values_reject_mutation() -> None:
+    source = StaticDataSource(_snapshot())
+
+    with pytest.raises(TypeError):
+        source.fetch_snapshot().values["close"] = 101.0
+
+    assert source.fetch_snapshot().values["close"] == 100.0
