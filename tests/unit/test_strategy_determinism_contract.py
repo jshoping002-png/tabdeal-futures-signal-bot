@@ -1,4 +1,3 @@
-```python
 from datetime import datetime, timedelta, timezone
 
 from tabdeal_signal.data.contracts import MarketSnapshot
