@@ -89,6 +89,16 @@ def test_non_string_event_id_is_quarantined_without_transport_call():
     assert persistence.dead_lettered == []
 
 
+def test_missing_internal_id_is_ignored_without_transport_or_retry():
+    persistence = FakePersistence([{"payload_json": json.dumps({"decision": "LONG"})}])
+    transport = FakeTransport()
+    NotificationWorker(persistence, transport).run_once(now="2026-01-01T00:00:00+00:00")
+    assert transport.calls == []
+    assert persistence.quarantined == []
+    assert persistence.retried == []
+    assert persistence.dead_lettered == []
+
+
 def test_worker_configuration_rejects_invalid_values():
     persistence = FakePersistence([])
     transport = FakeTransport()
