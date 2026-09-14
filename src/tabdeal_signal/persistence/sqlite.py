@@ -147,7 +147,7 @@ class SQLiteDecisionPersistence:
         with self._connection:
             rows = self._connection.execute(
                 """
-                SELECT event_id FROM outbox
+                SELECT rowid AS internal_id, event_id FROM outbox
                 WHERE (
                     status = 'PENDING'
                     OR (status = 'RETRY' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
@@ -172,7 +172,8 @@ class SQLiteDecisionPersistence:
                     (locked_until, current, row["event_id"]),
                 )
                 item = self._connection.execute(
-                    "SELECT * FROM outbox WHERE event_id = ?", (row["event_id"],)
+                    "SELECT rowid AS internal_id, * FROM outbox WHERE event_id = ?",
+                    (row["event_id"],),
                 ).fetchone()
                 if item is not None:
                     claimed.append(dict(item))
@@ -193,9 +194,7 @@ class SQLiteDecisionPersistence:
             if cursor.rowcount != 1:
                 raise ValueError(f"outbox event is not processing: {event_id}")
 
-    def mark_outbox_retry(
-        self, event_id: str, next_attempt_at: str, error: str
-    ) -> None:
+    def mark_outbox_retry(self, event_id: str, next_attempt_at: str, error: str) -> None:
         if not error.strip():
             raise ValueError("error must be non-empty")
         with self._connection:
@@ -221,12 +220,30 @@ class SQLiteDecisionPersistence:
                 SET status = 'DEAD_LETTER', locked_until = NULL,
                     last_error = ?, updated_at = ?
                 WHERE event_id = ? AND status = 'PROCESSING'
-                """
-                ,
+                """,
                 (error, _utc_now(), event_id),
             )
             if cursor.rowcount != 1:
                 raise ValueError(f"outbox event is not processing: {event_id}")
+
+    def quarantine_outbox_record(self, internal_id: int, error: str) -> None:
+        """Dead-letter a malformed claimed row without trusting its event id."""
+        if not isinstance(internal_id, int) or internal_id <= 0:
+            raise ValueError("internal_id must be positive")
+        if not error.strip():
+            raise ValueError("error must be non-empty")
+        with self._connection:
+            cursor = self._connection.execute(
+                """
+                UPDATE outbox
+                SET status = 'DEAD_LETTER', locked_until = NULL,
+                    last_error = ?, updated_at = ?
+                WHERE rowid = ? AND status = 'PROCESSING'
+                """,
+                (error, _utc_now(), internal_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(f"outbox row is not processing: {internal_id}")
 
     def recover_expired_processing(self, now: str | None = None) -> int:
         """Return expired leases to RETRY without creating new events."""
