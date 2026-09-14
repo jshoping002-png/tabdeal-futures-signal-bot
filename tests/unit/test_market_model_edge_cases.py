@@ -2,19 +2,13 @@ from decimal import Decimal
 
 import pytest
 
-from tabdeal_signal.data_sources.market import Candle
 from tests.unit.test_market_models import make_candle
 
 
-@pytest.mark.parametrize("field", ["open", "low", "close"])
+@pytest.mark.parametrize("field", ["open", "high", "low", "close"])
 def test_candle_rejects_negative_prices(field):
     with pytest.raises(ValueError, match="prices must be non-negative"):
         make_candle(**{field: Decimal("-0.01")})
-
-
-def test_candle_rejects_negative_high():
-    with pytest.raises(ValueError, match="high"):
-        make_candle(high=Decimal("-0.01"))
 
 
 def test_candle_rejects_non_positive_interval():
