@@ -96,3 +96,12 @@ def test_formatter_does_not_leak_transport_secrets() -> None:
 
     assert "super-secret-token" not in result
     assert "private-chat-id" not in result
+
+
+def test_leverage_suffix_is_not_duplicated() -> None:
+    result = format_rich_signal_notification(
+        {"signal": {"direction": "LONG", "recommended_leverage": "3x"}}
+    )
+
+    assert "⚡ Recommended leverage: 3x" in result
+    assert "3xx" not in result
