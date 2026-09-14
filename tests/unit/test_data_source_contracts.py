@@ -149,6 +149,11 @@ def test_read_only_data_source_return_contract_is_explicit() -> None:
     assert fetch_snapshot.return_annotation in ("NormalizedSnapshot", NormalizedSnapshot)
 
 
+def test_read_only_data_source_as_of_is_optional() -> None:
+    fetch_snapshot = signature(ReadOnlyDataSource.fetch_snapshot)
+    assert fetch_snapshot.parameters["as_of"].default is None
+
+
 def test_contract_has_only_read_only_fetch_boundary() -> None:
     assert hasattr(ReadOnlyDataSource, "fetch_snapshot")
     assert not any(name in dir(ReadOnlyDataSource) for name in ("place_order", "execute_trade", "cancel_order"))
