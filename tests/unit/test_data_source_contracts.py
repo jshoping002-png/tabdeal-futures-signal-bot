@@ -88,6 +88,17 @@ def test_snapshot_rejects_invalid_metadata_type() -> None:
         NormalizedSnapshot(metadata="invalid", values={"close": 100.0})
 
 
+def test_snapshot_rejects_non_mapping_values() -> None:
+    with pytest.raises(ValueError, match="values"):
+        NormalizedSnapshot(metadata=_metadata(), values=[("close", 100.0)])
+
+
+def test_snapshot_accepts_mapping_values() -> None:
+    snapshot = NormalizedSnapshot(_metadata(), {"close": 100.0, "volume": 12.5})
+    assert snapshot.values["close"] == 100.0
+    assert snapshot.values["volume"] == 12.5
+
+
 def test_snapshot_is_immutable_and_quality_is_explicit() -> None:
     snapshot = NormalizedSnapshot(_metadata(), {"close": 100.0})
     assert snapshot.metadata.quality is DataQualityStatus.VALID
