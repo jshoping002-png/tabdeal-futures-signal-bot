@@ -5,6 +5,7 @@ from tabdeal_signal.data_sources import (
     NormalizedSnapshot,
     ReadOnlyDataSource,
     SourceKind,
+    StaticDataSource,
 )
 from tabdeal_signal.data_sources import __all__ as data_source_exports
 from tabdeal_signal.data_sources.contracts import (
@@ -15,6 +16,7 @@ from tabdeal_signal.data_sources.contracts import (
     ReadOnlyDataSource as module_source,
     SourceKind as module_kind,
 )
+from tabdeal_signal.data_sources.static import StaticDataSource as module_static
 
 
 def test_data_source_package_exports_match_contract_symbols() -> None:
@@ -24,6 +26,7 @@ def test_data_source_package_exports_match_contract_symbols() -> None:
     assert NormalizedSnapshot is module_snapshot
     assert ReadOnlyDataSource is module_source
     assert SourceKind is module_kind
+    assert StaticDataSource is module_static
 
 
 def test_data_source_package_exports_are_explicit_and_stable() -> None:
@@ -34,4 +37,5 @@ def test_data_source_package_exports_are_explicit_and_stable() -> None:
         "NormalizedSnapshot",
         "ReadOnlyDataSource",
         "SourceKind",
+        "StaticDataSource",
     ]
