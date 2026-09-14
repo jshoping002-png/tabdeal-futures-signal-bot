@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from types import MappingProxyType
 
 import pytest
 
@@ -97,6 +98,13 @@ def test_snapshot_accepts_mapping_values() -> None:
     snapshot = NormalizedSnapshot(_metadata(), {"close": 100.0, "volume": 12.5})
     assert snapshot.values["close"] == 100.0
     assert snapshot.values["volume"] == 12.5
+
+
+def test_snapshot_accepts_read_only_mapping_values() -> None:
+    values = MappingProxyType({"close": 100.0, "volume": 12.5})
+    snapshot = NormalizedSnapshot(_metadata(), values)
+    assert snapshot.values is values
+    assert snapshot.values["close"] == 100.0
 
 
 def test_provenance_is_immutable() -> None:
