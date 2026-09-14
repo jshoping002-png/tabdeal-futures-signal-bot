@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from inspect import signature
 from types import MappingProxyType
 
 import pytest
@@ -135,6 +136,12 @@ def test_snapshot_is_immutable_and_quality_is_explicit() -> None:
     assert snapshot.metadata.quality is DataQualityStatus.VALID
     with pytest.raises((AttributeError, TypeError)):
         snapshot.values = {}
+
+
+def test_read_only_data_source_signature_is_stable() -> None:
+    fetch_snapshot = signature(ReadOnlyDataSource.fetch_snapshot)
+    assert list(fetch_snapshot.parameters) == ["self", "as_of"]
+    assert fetch_snapshot.parameters["as_of"].kind is fetch_snapshot.parameters["as_of"].KEYWORD_ONLY
 
 
 def test_contract_has_only_read_only_fetch_boundary() -> None:
