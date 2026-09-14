@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -49,3 +49,31 @@ def test_metadata_accepts_optional_provenance_absence() -> None:
     )
 
     assert metadata.provenance is None
+
+
+def test_metadata_normalizes_all_optional_timestamps_to_utc() -> None:
+    offset = timezone(timedelta(hours=3))
+    metadata = DataSnapshotMetadata(
+        source_kind=SourceKind.EXCHANGE,
+        instrument_or_topic="BTCUSDT",
+        received_at=datetime(2026, 1, 1, 12, tzinfo=offset),
+        observed_at=datetime(2026, 1, 1, 13, tzinfo=offset),
+        published_at=datetime(2026, 1, 1, 14, tzinfo=offset),
+        effective_at=datetime(2026, 1, 1, 15, tzinfo=offset),
+        available_at=datetime(2026, 1, 1, 12, tzinfo=offset),
+    )
+
+    assert metadata.received_at == datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
+    assert metadata.observed_at == datetime(2026, 1, 1, 10, tzinfo=timezone.utc)
+    assert metadata.published_at == datetime(2026, 1, 1, 11, tzinfo=timezone.utc)
+    assert metadata.effective_at == datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+    assert metadata.available_at == datetime(2026, 1, 1, 9, tzinfo=timezone.utc)
+
+
+def test_metadata_rejects_non_datetime_timestamp() -> None:
+    with pytest.raises(ValueError, match="received_at"):
+        DataSnapshotMetadata(
+            source_kind=SourceKind.EXCHANGE,
+            instrument_or_topic="BTCUSDT",
+            received_at="2026-01-01T00:00:00Z",
+        )
