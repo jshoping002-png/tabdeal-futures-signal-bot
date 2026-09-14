@@ -163,3 +163,17 @@ def test_read_only_data_source_as_of_annotation_is_optional_datetime() -> None:
 def test_contract_has_only_read_only_fetch_boundary() -> None:
     assert hasattr(ReadOnlyDataSource, "fetch_snapshot")
     assert not any(name in dir(ReadOnlyDataSource) for name in ("place_order", "execute_trade", "cancel_order"))
+
+
+def test_metadata_defaults_are_explicit_and_safe() -> None:
+    metadata = DataSnapshotMetadata(
+        source_kind=SourceKind.EXCHANGE,
+        instrument_or_topic="BTCUSDT",
+        received_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    assert metadata.quality is DataQualityStatus.VALID
+    assert metadata.observed_at is None
+    assert metadata.published_at is None
+    assert metadata.effective_at is None
+    assert metadata.available_at is None
+    assert metadata.provenance is None
