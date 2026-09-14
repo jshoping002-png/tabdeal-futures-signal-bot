@@ -171,3 +171,22 @@ def test_expired_processing_lease_returns_record_to_retry(tmp_path):
         assert row["last_error"] == "lease expired"
     finally:
         db.close()
+
+
+def test_sent_outbox_record_is_not_claimed_again(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(_request(tmp_path, status=DecisionStatus.SIGNAL, key="sent-key", event_id="sent-event"))
+        claimed = db.claim_pending_outbox(now="2026-01-01T00:00:00+00:00", lease_seconds=60, limit=1)
+        assert len(claimed) == 1
+        db.mark_outbox_sent("sent-event", sent_at="2026-01-01T00:00:30+00:00")
+        assert db.claim_pending_outbox(now="2026-01-01T00:01:00+00:00", limit=1) == []
+        row = db._connection.execute(
+            "SELECT status, sent_at, locked_until FROM outbox WHERE event_id = ?",
+            ("sent-event",),
+        ).fetchone()
+        assert row["status"] == "SENT"
+        assert row["sent_at"] == "2026-01-01T00:00:30+00:00"
+        assert row["locked_until"] is None
+    finally:
+        db.close()
