@@ -94,6 +94,11 @@ def test_snapshot_rejects_non_mapping_values() -> None:
         NormalizedSnapshot(metadata=_metadata(), values=[("close", 100.0)])
 
 
+def test_snapshot_rejects_non_string_value_keys() -> None:
+    with pytest.raises(ValueError, match="keys must be strings"):
+        NormalizedSnapshot(metadata=_metadata(), values={1: 100.0})
+
+
 def test_snapshot_accepts_mapping_values() -> None:
     snapshot = NormalizedSnapshot(_metadata(), {"close": 100.0, "volume": 12.5})
     assert snapshot.values["close"] == 100.0
