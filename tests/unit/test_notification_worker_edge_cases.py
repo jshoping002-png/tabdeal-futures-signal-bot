@@ -92,6 +92,23 @@ def test_max_attempts_moves_transport_failure_to_dead_letter():
     ]
 
 
+def test_empty_event_id_is_dead_lettered_without_transport_call():
+    persistence = FakePersistence(
+        [{"event_id": "   ", "payload_json": json.dumps({"decision": "LONG"})}]
+    )
+    transport = FakeTransport()
+
+    NotificationWorker(persistence, transport).run_once(
+        now="2026-01-01T00:00:00+00:00"
+    )
+
+    assert transport.calls == []
+    assert persistence.retried == []
+    assert persistence.dead_lettered == [
+        ("   ", "invalid event_id: empty or whitespace-only")
+    ]
+
+
 def test_worker_configuration_rejects_invalid_values():
     persistence = FakePersistence([])
     transport = FakeTransport()
