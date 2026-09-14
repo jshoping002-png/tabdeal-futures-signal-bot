@@ -71,8 +71,11 @@ def validate_candle_series(candles: tuple[Candle, ...], timeframe: str) -> Serie
     if len(set(keys)) != len(keys):
         reasons.append("DUPLICATE_CANDLE")
 
+    # Validate duration against the candle's declared timeframe. A mismatch with
+    # the requested series is reported separately and must not manufacture a
+    # second duration error from the requested timeframe.
     for candle in candles:
-        if candle.close_time - candle.open_time != spec.duration:
+        if candle.timeframe == timeframe and candle.close_time - candle.open_time != spec.duration:
             reasons.append("INVALID_CANDLE_DURATION")
             break
 
