@@ -107,6 +107,32 @@ def test_signal_creates_outbox(tmp_path):
         db.close()
 
 
+def test_signal_without_event_id_uses_deterministic_fallback(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        request = _request(
+            tmp_path,
+            status=DecisionStatus.SIGNAL,
+            key="fallback-signal-key",
+        )
+
+        first = db.persist(request)
+        second = db.persist(request)
+
+        assert first.persisted is True
+        assert second.persisted is True
+        assert second.idempotent_replay is True
+
+        rows = db._connection.execute(
+            "SELECT event_id FROM outbox WHERE idempotency_key = ?",
+            ("fallback-signal-key",),
+        ).fetchall()
+        assert len(rows) == 1
+        assert rows[0]["event_id"] == "signal:fallback-signal-key"
+    finally:
+        db.close()
+
+
 def test_outbox_failure_rolls_back_decision(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
