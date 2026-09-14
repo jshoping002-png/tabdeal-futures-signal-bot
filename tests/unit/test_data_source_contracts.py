@@ -107,6 +107,12 @@ def test_snapshot_accepts_read_only_mapping_values() -> None:
     assert snapshot.values["close"] == 100.0
 
 
+def test_read_only_mapping_rejects_mutation() -> None:
+    values = MappingProxyType({"close": 100.0})
+    with pytest.raises(TypeError):
+        values["close"] = 101.0
+
+
 def test_provenance_is_immutable() -> None:
     provenance = DataProvenance("test", "fixture://btc", "1")
     with pytest.raises((AttributeError, TypeError)):
