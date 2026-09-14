@@ -150,3 +150,24 @@ def test_quarantine_outbox_record_dead_letters_claimed_row(tmp_path):
         assert row["locked_until"] is None
     finally:
         db.close()
+
+
+def test_expired_processing_lease_returns_record_to_retry(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(_request(tmp_path, status=DecisionStatus.SIGNAL, key="lease-key", event_id="lease-event"))
+        claimed = db.claim_pending_outbox(now="2026-01-01T00:00:00+00:00", lease_seconds=60, limit=1)
+        assert len(claimed) == 1
+        assert claimed[0]["status"] == "PROCESSING"
+        recovered = db.recover_expired_processing(now="2026-01-01T00:01:00+00:00")
+        assert recovered == 1
+        row = db._connection.execute(
+            "SELECT status, next_attempt_at, locked_until, last_error FROM outbox WHERE event_id = ?",
+            ("lease-event",),
+        ).fetchone()
+        assert row["status"] == "RETRY"
+        assert row["next_attempt_at"] == "2026-01-01T00:01:00+00:00"
+        assert row["locked_until"] is None
+        assert row["last_error"] == "lease expired"
+    finally:
+        db.close()
