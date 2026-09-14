@@ -51,6 +51,16 @@ def test_metadata_accepts_optional_provenance_absence() -> None:
     assert metadata.provenance is None
 
 
+def test_metadata_rejects_invalid_provenance_type() -> None:
+    with pytest.raises(ValueError, match="provenance"):
+        DataSnapshotMetadata(
+            source_kind=SourceKind.NEWS,
+            instrument_or_topic="headline",
+            received_at=_received_at(),
+            provenance={"source": "fixture"},
+        )
+
+
 def test_metadata_normalizes_all_optional_timestamps_to_utc() -> None:
     offset = timezone(timedelta(hours=3))
     metadata = DataSnapshotMetadata(
