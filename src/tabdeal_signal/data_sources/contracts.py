@@ -73,6 +73,8 @@ class DataSnapshotMetadata:
             raise ValueError("source_kind must be a SourceKind")
         if not isinstance(self.quality, DataQualityStatus):
             raise ValueError("quality must be a DataQualityStatus")
+        if self.provenance is not None and not isinstance(self.provenance, DataProvenance):
+            raise ValueError("provenance must be DataProvenance")
         if not isinstance(self.instrument_or_topic, str) or not self.instrument_or_topic.strip():
             raise ValueError("instrument_or_topic must be a non-empty string")
         for name in (
