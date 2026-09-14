@@ -7,9 +7,9 @@ submit orders, execute trades, or call an exchange trading endpoint.
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Protocol
+from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Protocol
 
 from tabdeal_signal.notifications.transport import NotificationTransport
 
