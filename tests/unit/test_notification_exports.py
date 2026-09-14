@@ -3,6 +3,13 @@ from tabdeal_signal.notifications import (
     format_rich_signal_notification,
     format_signal_notification,
 )
+from tabdeal_signal.notifications.signal_message import (
+    format_rich_signal_notification as module_rich_formatter,
+)
+from tabdeal_signal.notifications.transport import (
+    NotificationTransport as module_transport,
+    format_signal_notification as module_formatter,
+)
 
 
 def test_notification_public_exports_are_importable() -> None:
@@ -20,3 +27,9 @@ def test_notification_exports_preserve_formatter_boundaries() -> None:
     assert simple.startswith("SIGNAL | status=SIGNAL | decision=")
     assert "🟢 LONG — BUY" in rich
     assert "No order execution is performed." in rich
+
+
+def test_notification_exports_match_implementation_symbols() -> None:
+    assert NotificationTransport is module_transport
+    assert format_signal_notification is module_formatter
+    assert format_rich_signal_notification is module_rich_formatter
