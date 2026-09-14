@@ -65,3 +65,20 @@ def test_strategy_evaluation_rejects_snapshot_data_unavailable_at_reference_time
         assert str(exc) == "snapshot contains data unavailable at reference_time"
     else:
         raise AssertionError("future snapshot data must be rejected")
+
+
+def test_long_and_short_evaluators_are_isolated():
+    snapshot_request = request()
+    long_result = MultiTimeframeStrategyEvaluator(
+        symbol="BTCUSDT", direction=Direction.LONG
+    ).evaluate(snapshot_request)
+    short_result = MultiTimeframeStrategyEvaluator(
+        symbol="BTCUSDT", direction=Direction.SHORT
+    ).evaluate(snapshot_request)
+
+    assert long_result.direction is Direction.LONG
+    assert long_result.eligible is True
+    assert long_result.reason_code == "ENTRY_BREAKOUT_LONG"
+    assert short_result.direction is Direction.SHORT
+    assert short_result.eligible is False
+    assert short_result.reason_code == "TREND_LONG_CONFIRMED"
