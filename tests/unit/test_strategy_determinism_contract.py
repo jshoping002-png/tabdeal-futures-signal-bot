@@ -87,6 +87,17 @@ def test_strategy_evaluation_blocks_when_15m_breakout_is_missing():
     assert result.reason_code == "ENTRY_NOT_CONFIRMED"
 
 
+def test_strategy_evaluation_rejects_equal_15m_breakout_boundary():
+    request_value = request()
+    snapshot = request_value.snapshot
+    modified_candles = tuple(Candle(c.symbol, c.timeframe, c.open_time, c.close_time, c.open, c.high, c.low, 20.0 if c.timeframe == "15m" and c.open_time == BASE + timedelta(hours=57, minutes=15) else c.close, c.volume) for c in snapshot.candles)
+    modified_snapshot = MarketSnapshot(snapshot.snapshot_id, snapshot.source_id, snapshot.reference_time, modified_candles)
+    modified_request = StrategyEvaluationRequest(request_value.context, modified_snapshot)
+    result = MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction=Direction.LONG).evaluate(modified_request)
+    assert result.eligible is False
+    assert result.reason_code == "ENTRY_NOT_CONFIRMED"
+
+
 def test_strategy_evaluation_blocks_after_confirmed_choch():
     request_value = request()
     snapshot = request_value.snapshot
