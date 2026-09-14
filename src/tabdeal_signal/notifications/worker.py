@@ -75,6 +75,10 @@ class NotificationWorker:
     def _process_record(self, record: Mapping[str, Any], *, current: str) -> None:
         event_id = record.get("event_id")
         if not isinstance(event_id, str) or not event_id.strip():
+            if isinstance(event_id, str):
+                self._persistence.mark_outbox_dead_letter(
+                    event_id, "invalid event_id: empty or whitespace-only"
+                )
             return
 
         try:
