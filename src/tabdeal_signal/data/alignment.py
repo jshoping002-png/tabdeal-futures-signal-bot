@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from tabdeal_signal.data.series import TimeframeSpec
+from tabdeal_signal.data.series import TimeframeSpec, validate_candle_series
 from tabdeal_signal.domain.contracts import Candle, UTC
 
 
@@ -31,6 +31,18 @@ class AlignmentPolicy:
         if elapsed < timedelta(0):
             return False
         return elapsed % self.timeframe.duration == timedelta(0)
+
+
+@dataclass(frozen=True, slots=True)
+class AlignmentResult:
+    candle: Candle | None
+    reason_codes: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.candle is not None and self.reason_codes:
+            raise ValueError("a selected candle cannot have reason codes")
+        if self.candle is None and not self.reason_codes:
+            raise ValueError("a blocked alignment requires reason codes")
 
 
 def select_closed_candles(
@@ -75,3 +87,48 @@ def validate_alignment(candles: tuple[Candle, ...], policy: AlignmentPolicy) -> 
     if has_boundary_mismatch:
         reasons.append("CANDLE_BOUNDARY_MISMATCH")
     return tuple(reasons)
+
+
+def align_latest_closed_candle(
+    candles: tuple[Candle, ...],
+    timeframe: str,
+    reference_time: datetime,
+    anchor_time: datetime,
+) -> AlignmentResult:
+    """Validate a series, enforce explicit boundaries, then select the latest closed candle."""
+    if not isinstance(timeframe, str):
+        raise ValueError("timeframe must be a string")
+    if not isinstance(reference_time, datetime):
+        raise ValueError("reference_time must be a datetime")
+    if reference_time.tzinfo is None or reference_time.tzinfo != UTC:
+        return AlignmentResult(None, ("NON_UTC_REFERENCE",))
+    if not isinstance(anchor_time, datetime):
+        raise ValueError("anchor_time must be a datetime")
+    if anchor_time.tzinfo is None or anchor_time.tzinfo != UTC:
+        return AlignmentResult(None, ("NON_UTC_ANCHOR",))
+    if not isinstance(candles, tuple):
+        raise ValueError("candles must be a tuple")
+
+    try:
+        spec = TimeframeSpec.parse(timeframe)
+    except ValueError:
+        return AlignmentResult(None, ("INVALID_TIMEFRAME",))
+
+    integrity = validate_candle_series(candles, timeframe)
+    if not integrity.valid:
+        return AlignmentResult(None, integrity.reason_codes)
+
+    policy = AlignmentPolicy(spec, anchor_time)
+    alignment_reasons = validate_alignment(candles, policy)
+    if alignment_reasons:
+        return AlignmentResult(None, alignment_reasons)
+
+    eligible = select_closed_candles(candles, reference_time)
+    if not eligible:
+        return AlignmentResult(None, ("NO_CLOSED_CANDLE",))
+
+    latest_close = max(candle.close_time for candle in eligible)
+    latest = tuple(candle for candle in eligible if candle.close_time == latest_close)
+    if len(latest) != 1:
+        return AlignmentResult(None, ("AMBIGUOUS_CANDLE_ALIGNMENT",))
+    return AlignmentResult(latest[0])
