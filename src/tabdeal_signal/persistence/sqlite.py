@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from dataclasses import asdict, is_dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -76,7 +76,7 @@ class SQLiteDecisionPersistence:
                 raise PersistenceCollisionError(
                     f"idempotency key collision: {key}"
                 )
-            return PersistenceResult(persisted=False, idempotent_replay=True)
+            return PersistenceResult(persisted=True, idempotent_replay=True)
 
         decision = request.decision
         status = getattr(getattr(decision, "status", None), "value", decision.status)
@@ -105,7 +105,7 @@ class SQLiteDecisionPersistence:
 
 
 def _utc_now() -> str:
-    return datetime.now().astimezone().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 def _event_id(request: PersistenceRequest) -> str:
