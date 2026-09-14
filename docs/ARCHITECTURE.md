@@ -36,13 +36,21 @@ Each boundary has an explicit contract. Invalid or uncertain critical input fail
 
 `MarketDataSource` is the technology-neutral market-data boundary. A real exchange/provider adapter belongs behind this interface and requires its own verified external-provider contract before production activation.
 
+The source roadmap includes public/no-API-key candidates such as Binance, Bybit, OKX, Kraken, Coinbase Exchange, and Deribit for market/derivatives data. This is a source inventory, not an activation claim; provider-specific endpoints, timestamps, availability semantics, limits, and operational behavior must be verified before implementation.
+
+Macro/economic and external intelligence sources are separate from the market-data transport boundary. Public/no-key sources are preferred where their published API permits programmatic access. They must not be converted into strategy rules without a separate domain contract.
+
 ### Phase 2 — Validation
 
 Validates received data according to the existing data/domain contracts. Provider-specific transport behavior does not belong here.
 
-### Phases 3–10 — Decision pipeline
+### Phase 3 — Point-in-Time Snapshot
 
-PIT snapshot, series integrity, candle alignment, strategy, LONG/SHORT isolation, conflict, risk, final decision, and signal identity remain deterministic and provider/storage independent.
+The PIT snapshot boundary is defined by `PIT_SNAPSHOT_CONTRACT_V1.md`. It creates the immutable temporal view consumed by downstream decision stages and enforces the strict closed-candle rule `close_time < reference_time`.
+
+### Phases 4–10 — Decision pipeline
+
+Series integrity, candle alignment, strategy, LONG/SHORT isolation, conflict, risk, final decision, and signal identity remain deterministic and provider/storage independent.
 
 ### Phase 11 — Persistence
 
@@ -64,6 +72,14 @@ Retry decisions belong to `RETRY_POLICY_CONTRACT_V1.md`. Retry policy is separat
 
 If asynchronous transport is needed, it belongs between Outbox and the delivery worker and must satisfy `QUEUE_BROKER_BOUNDARY.md`. A queue/broker is not mandatory and must not silently redefine retry or persistence semantics.
 
+## External intelligence boundary
+
+Market analysis may eventually consume multiple information classes: exchange market/derivatives data, order flow/liquidity, on-chain and whale activity, macro/economic events, risk indicators, and news/events. These sources are inputs to an intelligence layer; they are not automatically trading rules.
+
+For every source, the implementation must preserve point-in-time semantics, provenance, availability timestamps, validation status, and fail-closed behavior. A provider requiring API keys or paid credentials is not an eligible source for the current no-key source set unless separately approved.
+
+No external intelligence source may silently override the Strategy Contract, Risk Policy Contract, or Conflict Gate.
+
 ## Explicit non-goals
 
 - exchange order execution;
@@ -78,6 +94,8 @@ If asynchronous transport is needed, it belongs between Outbox and the delivery 
 | Boundary | Contract | Status |
 | --- | --- | --- |
 | Market data source / ingestion | `DATA_SOURCE_CONTRACT_V1.md` | IMPLEMENTED |
+| Data provider/source inventory | Architecture source inventory | DESIGNED |
+| Point-in-Time snapshot | `PIT_SNAPSHOT_CONTRACT_V1.md` | DESIGNED / IMPLEMENTED boundary |
 | Decision / signal identity | `DECISION_IDENTITY_V1.md` | DESIGNED / IMPLEMENTED |
 | Persistence | `PERSISTENCE_CONTRACT_V1.md` | DESIGNED / IMPLEMENTED reference |
 | Production persistence adapter | `PRODUCTION_PERSISTENCE_CONTRACT_V1.md` | DESIGNED |
