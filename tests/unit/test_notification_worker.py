@@ -13,6 +13,7 @@ class FakePersistence:
         self.sent: list[str] = []
         self.retried: list[tuple[str, str, str]] = []
         self.dead: list[tuple[str, str]] = []
+        self.quarantined: list[tuple[int, str]] = []
 
     def claim_pending_outbox(self, now=None, lease_seconds=60, limit=10):
         return self.records
@@ -25,6 +26,9 @@ class FakePersistence:
 
     def mark_outbox_dead_letter(self, event_id, error):
         self.dead.append((event_id, error))
+
+    def quarantine_outbox_record(self, internal_id, error):
+        self.quarantined.append((internal_id, error))
 
 
 class FakeTransport:
