@@ -18,7 +18,7 @@ from tabdeal_signal.persistence.contracts import PersistenceRequest, Persistence
 
 
 class PersistenceCollisionError(RuntimeError):
-    """Raised when an idempotency key is reused with different content."""
+    """Raised when an idempotency key or event id is reused incorrectly."""
 
 
 class SQLiteDecisionPersistence:
@@ -56,13 +56,50 @@ class SQLiteDecisionPersistence:
                 idempotency_key TEXT NOT NULL UNIQUE,
                 payload_json TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'PENDING',
+                attempt_count INTEGER NOT NULL DEFAULT 0,
+                next_attempt_at TEXT,
+                locked_until TEXT,
+                last_error TEXT,
+                sent_at TEXT,
                 created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
                 FOREIGN KEY (idempotency_key)
                     REFERENCES decisions(idempotency_key)
                     ON DELETE RESTRICT
             );
             """
         )
+        self._connection.commit()
+        self._ensure_outbox_columns()
+
+    def _ensure_outbox_columns(self) -> None:
+        """Add lifecycle columns to databases created by earlier revisions."""
+        existing = {
+            row["name"]
+            for row in self._connection.execute("PRAGMA table_info(outbox)").fetchall()
+        }
+        additions = {
+            "attempt_count": "INTEGER NOT NULL DEFAULT 0",
+            "next_attempt_at": "TEXT",
+            "locked_until": "TEXT",
+            "last_error": "TEXT",
+            "sent_at": "TEXT",
+            "updated_at": "TEXT",
+        }
+        for name, definition in additions.items():
+            if name not in existing:
+                default = "created_at" if name == "updated_at" else None
+                if default is not None:
+                    self._connection.execute(
+                        f"ALTER TABLE outbox ADD COLUMN {name} TEXT"
+                    )
+                    self._connection.execute(
+                        "UPDATE outbox SET updated_at = created_at WHERE updated_at IS NULL"
+                    )
+                else:
+                    self._connection.execute(
+                        f"ALTER TABLE outbox ADD COLUMN {name} {definition}"
+                    )
         self._connection.commit()
 
     def persist(self, request: PersistenceRequest) -> PersistenceResult:
@@ -73,9 +110,7 @@ class SQLiteDecisionPersistence:
         ).fetchone()
         if existing is not None:
             if existing["payload_json"] != payload:
-                raise PersistenceCollisionError(
-                    f"idempotency key collision: {key}"
-                )
+                raise PersistenceCollisionError(f"idempotency key collision: {key}")
             return PersistenceResult(persisted=True, idempotent_replay=True)
 
         decision = request.decision
@@ -94,26 +129,138 @@ class SQLiteDecisionPersistence:
                 if status == "SIGNAL":
                     self._connection.execute(
                         "INSERT INTO outbox "
-                        "(event_id, idempotency_key, payload_json, created_at) "
-                        "VALUES (?, ?, ?, ?)",
-                        (event_id, key, payload, created_at),
+                        "(event_id, idempotency_key, payload_json, created_at, updated_at) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (event_id, key, payload, created_at, created_at),
                     )
         except sqlite3.IntegrityError as exc:
             raise PersistenceCollisionError(str(exc)) from exc
 
         return PersistenceResult(persisted=True, idempotent_replay=False)
 
+    def claim_pending_outbox(
+        self, now: str | None = None, lease_seconds: int = 60, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """Atomically claim eligible records for notification delivery."""
+        if lease_seconds <= 0 or limit <= 0:
+            raise ValueError("lease_seconds and limit must be positive")
+        current = now or _utc_now()
+        locked_until = _plus_seconds(current, lease_seconds)
+        claimed: list[dict[str, Any]] = []
+        with self._connection:
+            rows = self._connection.execute(
+                """
+                SELECT event_id FROM outbox
+                WHERE (
+                    status = 'PENDING'
+                    OR (status = 'RETRY' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
+                    OR (status = 'PROCESSING' AND locked_until IS NOT NULL AND locked_until <= ?)
+                )
+                ORDER BY created_at, event_id
+                LIMIT ?
+                """,
+                (current, current, limit),
+            ).fetchall()
+            for row in rows:
+                self._connection.execute(
+                    """
+                    UPDATE outbox
+                    SET status = 'PROCESSING',
+                        attempt_count = attempt_count + 1,
+                        locked_until = ?,
+                        updated_at = ?,
+                        last_error = NULL
+                    WHERE event_id = ?
+                    """,
+                    (locked_until, current, row["event_id"]),
+                )
+                item = self._connection.execute(
+                    "SELECT * FROM outbox WHERE event_id = ?", (row["event_id"],)
+                ).fetchone()
+                if item is not None:
+                    claimed.append(dict(item))
+        return claimed
+
+    def mark_outbox_sent(self, event_id: str, sent_at: str | None = None) -> None:
+        timestamp = sent_at or _utc_now()
+        with self._connection:
+            cursor = self._connection.execute(
+                """
+                UPDATE outbox
+                SET status = 'SENT', sent_at = ?, locked_until = NULL,
+                    next_attempt_at = NULL, last_error = NULL, updated_at = ?
+                WHERE event_id = ? AND status = 'PROCESSING'
+                """,
+                (timestamp, timestamp, event_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(f"outbox event is not processing: {event_id}")
+
+    def mark_outbox_retry(
+        self, event_id: str, next_attempt_at: str, error: str
+    ) -> None:
+        if not error.strip():
+            raise ValueError("error must be non-empty")
+        with self._connection:
+            cursor = self._connection.execute(
+                """
+                UPDATE outbox
+                SET status = 'RETRY', next_attempt_at = ?, locked_until = NULL,
+                    last_error = ?, updated_at = ?
+                WHERE event_id = ? AND status = 'PROCESSING'
+                """,
+                (next_attempt_at, error, _utc_now(), event_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(f"outbox event is not processing: {event_id}")
+
+    def mark_outbox_dead_letter(self, event_id: str, error: str) -> None:
+        if not error.strip():
+            raise ValueError("error must be non-empty")
+        with self._connection:
+            cursor = self._connection.execute(
+                """
+                UPDATE outbox
+                SET status = 'DEAD_LETTER', locked_until = NULL,
+                    last_error = ?, updated_at = ?
+                WHERE event_id = ? AND status = 'PROCESSING'
+                """,
+                (error, _utc_now(), event_id),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(f"outbox event is not processing: {event_id}")
+
+    def recover_expired_processing(self, now: str | None = None) -> int:
+        """Return expired leases to RETRY without creating new events."""
+        current = now or _utc_now()
+        with self._connection:
+            cursor = self._connection.execute(
+                """
+                UPDATE outbox
+                SET status = 'RETRY', locked_until = NULL,
+                    next_attempt_at = ?, last_error = COALESCE(last_error, 'lease expired'),
+                    updated_at = ?
+                WHERE status = 'PROCESSING' AND locked_until IS NOT NULL
+                  AND locked_until <= ?
+                """,
+                (current, current, current),
+            )
+            return cursor.rowcount
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _plus_seconds(timestamp: str, seconds: int) -> str:
+    value = datetime.fromisoformat(timestamp)
+    return (value + __import__("datetime").timedelta(seconds=seconds)).isoformat()
 
 
 def _event_id(request: PersistenceRequest) -> str:
     explicit = getattr(request, "event_id", None)
     if explicit:
         return str(explicit)
-    # Stable fallback keeps the current contract usable until event_id is
-    # promoted to a required field in PersistenceRequest.
     return f"signal:{request.idempotency_key}"
 
 
