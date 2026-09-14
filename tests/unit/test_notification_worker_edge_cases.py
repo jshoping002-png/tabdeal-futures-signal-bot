@@ -47,7 +47,9 @@ def test_invalid_payload_is_retried_without_transport_call():
     transport = FakeTransport()
     assert NotificationWorker(persistence, transport).run_once(now="2026-01-01T00:00:00+00:00") == 1
     assert transport.calls == []
-    assert len(persistence.retried) == 1
+    assert persistence.retried[0][0] == "evt-1"
+    assert persistence.retried[0][1] == "2026-01-01T00:00:30+00:00"
+    assert persistence.retried[0][2].startswith("JSONDecodeError:")
     assert persistence.dead_lettered == []
 
 
