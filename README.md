@@ -24,13 +24,13 @@ Queue/broker infrastructure is optional and belongs between Outbox and the deliv
 
 ## Current contract map
 
-- **Phase 1:** Data Source / Ingestion — implemented and CI verified.
-- **Phase 2:** Validation — next audit/verification target.
+- **Phase 1:** Data Source / Ingestion — implemented; CI verification status must be checked from repository workflow evidence.
+- **Phase 2:** Validation — audit/verification target.
 - **Phases 3–10:** PIT/temporal integrity, strategy, LONG/SHORT isolation, conflict, risk, final decision and signal identity — implemented contracts with gated verification status recorded in repository history.
-- **Phase 11:** Persistence — logical atomic/idempotent contract and in-memory reference implementation exist; production storage adapter remains to be implemented and verified.
-- **Phase 12:** Outbox / Notification Intent — contract, leased in-memory reference implementation, and dispatcher boundary exist; production delivery remains separate.
-- **Notification Delivery:** provider boundary is defined; Telegram requires a provider-specific implementation contract before implementation.
-- **Reliability:** retry-policy boundary is defined; numeric retry/backoff/scheduling values are not invented until explicitly approved.
+- **Phase 11:** Persistence — atomic/idempotent persistence contract, SQLite adapter, schema, replay/collision handling, and tests exist. Production deployment and operational verification remain incomplete.
+- **Phase 12:** Outbox / Notification Intent — SQLite-backed lifecycle exists with claim, lease recovery, retry, sent, and dead-letter transitions. Durable production operation and recovery testing remain to be verified.
+- **Notification Delivery:** transport boundary, deterministic formatter, Telegram configuration contract, and notification worker exist. A production Telegram provider and end-to-end delivery verification remain separate tasks.
+- **Reliability:** bounded worker retry behavior exists, but operational retry policy, alerting, and failure-management procedures require explicit verification.
 - **Queue/Broker:** optional boundary is defined; no broker technology is required or selected by default.
 
 ## Important boundaries
@@ -41,19 +41,19 @@ A concrete exchange/provider adapter implements `MarketDataSource` behind the Ph
 
 ### Production database/storage
 
-A concrete production persistence adapter implements the Phase 11 guarantees. Database vendor, schema, migrations, and deployment topology are separate implementation decisions.
+The repository contains a SQLite persistence adapter for atomic decision storage and signal outbox creation. Production database selection, migrations, backups, deployment topology, concurrency characteristics, and operational recovery remain separate implementation and verification decisions.
 
 ### Outbox
 
-Phase 12 persists notification intent and protects delivery with idempotency and lease ownership. It does not select Telegram, a database, a broker, or a retry algorithm.
+The outbox persists notification intent and protects delivery with idempotency and lease ownership. Its lifecycle includes pending, processing, retry, sent, and dead-letter states. It does not select Telegram, a broker, or a production deployment topology.
 
 ### Telegram / notification provider
 
-Telegram is a concrete notification provider behind the transport-neutral notification boundary. Its API/auth/configuration/error mapping must be explicitly contracted before production implementation.
+Telegram is a concrete notification provider behind the transport-neutral notification boundary. Its API/authentication, configuration, timeout behavior, error mapping, and end-to-end delivery must be explicitly contracted and verified before production use.
 
 ### Retry policy
 
-Retry decisions are a reliability concern and are separate from provider and Outbox semantics. The retry contract currently defines the boundary and fail-closed behavior without inventing retry counts or backoff values.
+Retry decisions are a reliability concern and are separate from provider and Outbox semantics. The worker has bounded retry/backoff behavior, while production retry budgets, alerting, dead-letter operations, and runbook procedures still require verification.
 
 ### Queue / broker
 
@@ -61,7 +61,7 @@ A queue/broker is optional infrastructure, not a business-logic requirement. If 
 
 ## Security and operational scope
 
-Production readiness additionally requires runtime configuration, secret-safe logging, health/observability, failure recovery, integration testing, and operational verification. These are not claimed complete merely because the domain contracts are implemented.
+Production readiness additionally requires runtime configuration, secret-safe logging, health/observability, failure recovery, integration testing, security checks, replay/backtest verification, and operational CI evidence. These are not claimed complete merely because the domain contracts or SQLite adapter are implemented.
 
 ## Status
 
