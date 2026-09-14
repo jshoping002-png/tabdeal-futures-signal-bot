@@ -147,7 +147,7 @@ class SQLiteDecisionPersistence:
         with self._connection:
             rows = self._connection.execute(
                 """
-                SELECT rowid AS internal_id, event_id FROM outbox
+                SELECT rowid AS internal_id FROM outbox
                 WHERE (
                     status = 'PENDING'
                     OR (status = 'RETRY' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
@@ -167,13 +167,13 @@ class SQLiteDecisionPersistence:
                         locked_until = ?,
                         updated_at = ?,
                         last_error = NULL
-                    WHERE event_id = ?
+                    WHERE eveWHERE rowid = ?nt_id = ?
                     """,
-                    (locked_until, current, row["event_id"]),
+                   (locked_until, current, row["internal_id"])
                 )
                 item = self._connection.execute(
-                    "SELECT rowid AS internal_id, * FROM outbox WHERE event_id = ?",
-                    (row["event_id"],),
+                    "SELECT rowid AS internal_id, * FROM outbox WHERE rowid = ?",
+                    (row["internal_id"],),
                 ).fetchone()
                 if item is not None:
                     claimed.append(dict(item))
