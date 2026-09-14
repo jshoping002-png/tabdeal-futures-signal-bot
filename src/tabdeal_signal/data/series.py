@@ -46,7 +46,7 @@ class SeriesIntegrityReport:
 
 
 def validate_candle_series(candles: tuple[Candle, ...], timeframe: str) -> SeriesIntegrityReport:
-    """Validate duration, ordering, overlap, and continuity without clock/network access."""
+    """Validate duration, ordering, duplicates, overlap, and continuity without clock/network access."""
     if not isinstance(candles, tuple):
         raise ValueError("candles must be a tuple")
     if any(not isinstance(candle, Candle) for candle in candles):
@@ -67,6 +67,10 @@ def validate_candle_series(candles: tuple[Candle, ...], timeframe: str) -> Serie
     if tuple(candles) != tuple(sorted(candles, key=lambda candle: candle.open_time)):
         reasons.append("NON_DETERMINISTIC_ORDER")
 
+    keys = [(candle.symbol, candle.timeframe, candle.open_time) for candle in candles]
+    if len(set(keys)) != len(keys):
+        reasons.append("DUPLICATE_CANDLE")
+
     for candle in candles:
         if candle.close_time - candle.open_time != spec.duration:
             reasons.append("INVALID_CANDLE_DURATION")
@@ -84,7 +88,8 @@ def validate_candle_series(candles: tuple[Candle, ...], timeframe: str) -> Serie
     if any(candle.open_time.tzinfo != UTC or candle.close_time.tzinfo != UTC for candle in candles):
         reasons.append("NON_UTC_TIMESTAMP")
 
-    return SeriesIntegrityReport(not reasons, tuple(dict.fromkeys(reasons))) if reasons else SeriesIntegrityReport(True, ())
+    unique_reasons = tuple(dict.fromkeys(reasons))
+    return SeriesIntegrityReport(not unique_reasons, unique_reasons)
 
 
 def validate_snapshot_series(snapshot: MarketSnapshot, timeframe: str) -> SeriesIntegrityReport:
