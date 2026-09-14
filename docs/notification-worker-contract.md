@@ -22,6 +22,13 @@ The notification worker delivers persisted **signal notifications** from the SQL
 - Once the claimed attempt count reaches `max_attempts`, the record is moved to `DEAD_LETTER`.
 - Error text is persisted for audit and operational diagnosis.
 
+## Event ID integrity
+
+- Every persisted outbox record must contain a stable, non-empty string `event_id`.
+- A blank or whitespace-only string is a malformed identifier. After claim, the worker moves it to `DEAD_LETTER` with the error `invalid event_id: empty or whitespace-only` and does not call the transport.
+- A missing or non-string `event_id` cannot safely be finalized through the current event-ID-based persistence methods. Such records require a persistence-level quarantine operation keyed by an internal row identity before production use.
+- The worker must not invent a replacement event ID during delivery, because that could break auditability and idempotency.
+
 ## Lease and recovery
 
 - Claiming a record changes its state to `PROCESSING` and sets `locked_until`.
