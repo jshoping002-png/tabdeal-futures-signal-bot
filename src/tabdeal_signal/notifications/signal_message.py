@@ -5,15 +5,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 
-def _value(payload: Mapping[str, object], *keys: str) -> object:
-    current: object = payload
-    for key in keys:
-        if not isinstance(current, Mapping):
-            return None
-        current = current.get(key)
-    return current
-
-
 def _line(label: str, value: object) -> str:
     return f"{label}: {value if value is not None else 'N/A'}"
 
@@ -21,15 +12,20 @@ def _line(label: str, value: object) -> str:
 def format_rich_signal_notification(payload: Mapping[str, object]) -> str:
     """Format a deterministic Telegram message without secrets or trade execution.
 
-    The formatter accepts either flat fields or fields nested under ``signal``.
-    Missing optional values are rendered as ``N/A`` rather than fabricated.
+    The formatter accepts flat fields, fields nested under ``signal``, or the
+    persistence shape ``decision.signal``. Missing values become ``N/A``.
     """
-    signal = payload.get("signal")
-    source: Mapping[str, object] = signal if isinstance(signal, Mapping) else payload
+    candidate = payload.get("signal")
+    if not isinstance(candidate, Mapping):
+        decision = payload.get("decision")
+        candidate = decision.get("signal") if isinstance(decision, Mapping) else None
+    source: Mapping[str, object] = candidate if isinstance(candidate, Mapping) else payload
+
     direction = str(source.get("direction", "UNKNOWN")).upper()
     is_long = direction in {"LONG", "BUY"}
-    marker = "🟢 LONG — BUY" if is_long else "🔴 SHORT — SELL" if direction in {"SHORT", "SELL"} else f"⚪ {direction}"
-    market_icon = "📈" if is_long else "📉" if direction in {"SHORT", "SELL"} else "📊"
+    is_short = direction in {"SHORT", "SELL"}
+    marker = "🟢 LONG — BUY" if is_long else "🔴 SHORT — SELL" if is_short else f"⚪ {direction}"
+    market_icon = "📈" if is_long else "📉" if is_short else "📊"
 
     leverage = source.get("recommended_leverage", source.get("leverage"))
     unlevered = source.get("estimated_return_pct", source.get("return_pct"))
@@ -39,7 +35,7 @@ def format_rich_signal_notification(payload: Mapping[str, object]) -> str:
 
     lines = [
         "📡 FUTURES SIGNAL",
-        f"{marker}",
+        marker,
         _line("💱 Symbol", source.get("symbol")),
         _line("🏦 Exchange", source.get("exchange")),
         _line("📄 Contract", source.get("contract_type", "Perpetual")),
