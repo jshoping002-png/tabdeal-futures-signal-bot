@@ -1,4 +1,4 @@
-"""Read-only data source contracts."""
+"""Read-only data source contracts and deterministic fixtures."""
 
 from .contracts import (
     DataProvenance,
@@ -8,6 +8,7 @@ from .contracts import (
     ReadOnlyDataSource,
     SourceKind,
 )
+from .static import StaticDataSource
 
 __all__ = [
     "DataProvenance",
@@ -16,4 +17,5 @@ __all__ = [
     "NormalizedSnapshot",
     "ReadOnlyDataSource",
     "SourceKind",
+    "StaticDataSource",
 ]
