@@ -15,6 +15,8 @@ This checklist applies to the signal-generation and signal-notification system o
 - [x] `SENT` records are not reclaimed by the claim query.
 - [x] Malformed claimed records can be quarantined when an internal row identifier exists.
 - [x] Notification formatting is deterministic and secret-free.
+- [x] Read-only data-source contracts validate typed metadata, provenance, timestamps, and snapshot values.
+- [x] Read-only data-source API signature and return-contract tests are present.
 - [x] CI executes compilation and the test suite.
 
 ## Not yet verified for production
