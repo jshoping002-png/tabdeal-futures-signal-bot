@@ -14,6 +14,7 @@ class PersistenceRequest:
     context: DecisionContext
     decision: FinalDecision
     idempotency_key: str
+    event_id: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.context, DecisionContext):
@@ -22,6 +23,10 @@ class PersistenceRequest:
             raise ValueError("decision must be a FinalDecision")
         if not isinstance(self.idempotency_key, str) or not self.idempotency_key.strip():
             raise ValueError("idempotency_key is required")
+        if self.event_id is not None and (
+            not isinstance(self.event_id, str) or not self.event_id.strip()
+        ):
+            raise ValueError("event_id must be a non-empty string when provided")
 
 
 @dataclass(frozen=True, slots=True)
