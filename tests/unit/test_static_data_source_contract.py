@@ -5,12 +5,14 @@ from tabdeal_signal.data_sources.static import StaticDataSource
 
 
 def test_static_data_source_implements_read_only_contract() -> None:
-    assert issubclass(StaticDataSource, ReadOnlyDataSource)
+    implementation_signature = signature(StaticDataSource.fetch_snapshot)
+
     assert hasattr(StaticDataSource, "fetch_snapshot")
     assert not any(
         name in dir(StaticDataSource)
         for name in ("place_order", "execute_trade", "cancel_order")
     )
+    assert list(implementation_signature.parameters) == ["self", "as_of"]
 
 
 def test_static_data_source_fetch_signature_matches_contract() -> None:
