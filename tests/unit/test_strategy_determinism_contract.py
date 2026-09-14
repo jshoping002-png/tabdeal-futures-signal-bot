@@ -35,7 +35,39 @@ def request():
     return StrategyEvaluationRequest(context, snapshot)
 
 
-def test_strategy_evaluation_is_deterministic_for_identical_snapshot_and_reference():
+def test_strategy_evaluation_is_deterministic_for_identical_snapshot_and_reference():def test_strategy_evaluation_does_not_use_post_reference_candles():
+    request_value = request()
+    reference_time = request_value.context.reference_time
+
+    future_candle = candle(
+        "15m",
+        reference_time,
+        timedelta(minutes=15),
+        high=1000.0,
+        low=1.0,
+        close=1000.0,
+    )
+
+    snapshot = MarketSnapshot(
+        request_value.snapshot.snapshot_id,
+        request_value.snapshot.source_id,
+        reference_time,
+        request_value.snapshot.candles + (future_candle,),
+    )
+    context = DecisionContext(
+        reference_time,
+        reference_time,
+        snapshot.snapshot_id,
+        "strategy-v1",
+    )
+    future_request = StrategyEvaluationRequest(context, snapshot)
+
+    evaluator = MultiTimeframeStrategyEvaluator(
+        symbol="BTCUSDT",
+        direction=Direction.LONG,
+    )
+
+    assert evaluator.evaluate(future_request) == evaluator.evaluate(request_value)
     evaluator = MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction=Direction.LONG)
     first = evaluator.evaluate(request())
     second = evaluator.evaluate(request())
