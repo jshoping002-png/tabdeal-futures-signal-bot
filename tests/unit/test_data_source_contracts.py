@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -30,6 +30,25 @@ def test_metadata_normalizes_aware_timestamps_to_utc() -> None:
         received_at=datetime(2026, 1, 1, 5, tzinfo=timezone.utc),
     )
     assert metadata.received_at.tzinfo == timezone.utc
+
+
+def test_metadata_normalizes_all_optional_timestamps_to_utc() -> None:
+    offset = timezone(timedelta(hours=5, minutes=30))
+    metadata = DataSnapshotMetadata(
+        source_kind=SourceKind.NEWS,
+        instrument_or_topic="headline",
+        received_at=datetime(2026, 1, 1, 5, 30, tzinfo=offset),
+        observed_at=datetime(2026, 1, 1, 10, 0, tzinfo=offset),
+        published_at=datetime(2026, 1, 1, 9, 0, tzinfo=offset),
+        effective_at=datetime(2026, 1, 1, 9, 15, tzinfo=offset),
+        available_at=datetime(2026, 1, 1, 5, 30, tzinfo=offset),
+    )
+
+    assert metadata.received_at == datetime(2026, 1, 1, tzinfo=timezone.utc)
+    assert metadata.observed_at == datetime(2026, 1, 1, 4, 30, tzinfo=timezone.utc)
+    assert metadata.published_at == datetime(2026, 1, 1, 3, 30, tzinfo=timezone.utc)
+    assert metadata.effective_at == datetime(2026, 1, 1, 3, 45, tzinfo=timezone.utc)
+    assert metadata.available_at == datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
 def test_naive_timestamp_is_rejected() -> None:
