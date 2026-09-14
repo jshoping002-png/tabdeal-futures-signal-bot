@@ -8,6 +8,7 @@ from .contracts import (
     ReadOnlyDataSource,
     SourceKind,
 )
+from .registry import SourceRegistration, SourceStatus
 from .static import StaticDataSource
 
 __all__ = [
@@ -17,5 +18,7 @@ __all__ = [
     "NormalizedSnapshot",
     "ReadOnlyDataSource",
     "SourceKind",
+    "SourceRegistration",
+    "SourceStatus",
     "StaticDataSource",
 ]
