@@ -1,12 +1,14 @@
-# Architecture — Phase 6
+# Architecture — System Scope and Boundaries
 
 ## Scope
 
-The system is a signal/alert engine only. Order execution and auto-trading are out of scope.
+The system is a deterministic signal/alert engine. Order execution and auto-trading are explicitly out of scope.
 
 ## Decision pipeline
 
-Data Source → Validation → Point-in-Time Snapshot → Series Integrity → Explicit Candle Alignment → Strategy Evaluation → LONG / SHORT Isolation → Conflict Gate → Risk Gate → Decision → Persistence/Outbox → Notification
+`Data Source → Validation → Point-in-Time Snapshot → Series Integrity → Explicit Candle Alignment → Strategy Evaluation → LONG / SHORT Isolation → Conflict Gate → Risk Gate → Decision → Persistence → Outbox → Delivery Worker → Notification Provider`
+
+The queue/broker is optional infrastructure between Outbox and the delivery worker. It is not part of the decision path and is not required unless a separately approved deployment design needs it.
 
 Each boundary has an explicit contract. Invalid or uncertain critical input fails closed.
 
@@ -22,27 +24,67 @@ Each boundary has an explicit contract. Invalid or uncertain critical input fail
 8. A deterministic input snapshot plus deterministic config produces one deterministic result.
 9. Critical failures produce no signal.
 10. Signal identity must be idempotent.
-11. Runtime data and generated artifacts never belong in Git.
-12. Runtime never mutates Git.
+11. Persistence and Outbox state must remain atomic and traceable according to their contracts.
+12. Delivery must use exact lease ownership and must be idempotent under redelivery.
+13. Runtime data and generated artifacts never belong in Git.
+14. Runtime never mutates Git.
+15. Secrets are runtime-only and must not enter source, fixtures, logs, snapshots, or business records.
 
-## Phase 6 — Explicit Candle Alignment Contract
+## Boundary ownership
 
-### Responsibilities
+### Phase 1 — Data Source / Ingestion
 
-- Require an explicit UTC anchor time for candle-boundary validation.
-- Validate that a candle's declared timeframe matches the policy timeframe.
-- Validate that candle open times fall exactly on the explicit timeframe boundary defined by the supplied anchor.
-- Reject non-UTC candle timestamps at the alignment boundary.
-- Return stable, deterministic reason codes without inferring an exchange or session calendar.
+`MarketDataSource` is the technology-neutral market-data boundary. A real exchange/provider adapter belongs behind this interface and requires its own verified external-provider contract before production activation.
 
-### Contract
+### Phase 2 — Validation
 
-`AlignmentPolicy` binds a fixed-duration `TimeframeSpec` to an explicit UTC `anchor_time`.
+Validates received data according to the existing data/domain contracts. Provider-specific transport behavior does not belong here.
 
-`AlignmentPolicy.contains()` accepts only candles whose timeframe matches the policy and whose open time is an exact duration multiple from the anchor.
+### Phases 3–10 — Decision pipeline
 
-`validate_alignment()` is pure and deterministic. It does not infer exchange-specific anchors, sessions, holidays, funding windows, or calendar semantics.
+PIT snapshot, series integrity, candle alignment, strategy, LONG/SHORT isolation, conflict, risk, final decision, and signal identity remain deterministic and provider/storage independent.
 
-### Explicit boundary
+### Phase 11 — Persistence
 
-Phase 6 does not define an exchange adapter, exchange-specific session/calendar rules, multi-timeframe parent-child mapping, indicator calculations, risk rules, or trading rules. Those require separate explicit contracts and must not be inferred.
+The logical persistence contract defines atomic decision + associated notification intent, durable idempotency, traceability, concurrency safety, and fail-closed behavior. A production database/storage adapter belongs behind that contract and must satisfy `PRODUCTION_PERSISTENCE_CONTRACT_V1.md`.
+
+### Phase 12 — Outbox / Notification Intent
+
+Outbox owns durable notification intent, idempotency, delivery state, and lease ownership. It deliberately does not choose a database, queue/broker, retry policy, or notification provider.
+
+### Notification Delivery — Provider boundary
+
+The delivery worker invokes the technology-neutral `NotificationSender`. A concrete provider, including Telegram, belongs behind `NOTIFICATION_PROVIDER_CONTRACT_V1.md`. Provider-specific API/auth/rate-limit behavior must be explicitly contracted before implementation.
+
+### Reliability — Retry policy
+
+Retry decisions belong to `RETRY_POLICY_CONTRACT_V1.md`. Retry policy is separate from strategy, risk, persistence, Outbox storage, and provider implementation. Numeric retry limits, backoff, scheduling, and time windows require explicit approval before production activation.
+
+### Optional Infrastructure — Queue / Broker
+
+If asynchronous transport is needed, it belongs between Outbox and the delivery worker and must satisfy `QUEUE_BROKER_BOUNDARY.md`. A queue/broker is not mandatory and must not silently redefine retry or persistence semantics.
+
+## Explicit non-goals
+
+- exchange order execution;
+- automatic buy/sell;
+- position opening/closing;
+- leverage, sizing, stop-loss/take-profit, funding, or execution behavior unless separately contracted as signal-domain behavior;
+- inventing provider-specific APIs or operational defaults;
+- committing secrets or runtime data to Git.
+
+## Contract map
+
+| Boundary | Contract | Status |
+| --- | --- | --- |
+| Market data source / ingestion | `DATA_SOURCE_CONTRACT_V1.md` | IMPLEMENTED |
+| Decision / signal identity | `DECISION_IDENTITY_V1.md` | DESIGNED / IMPLEMENTED |
+| Persistence | `PERSISTENCE_CONTRACT_V1.md` | DESIGNED / IMPLEMENTED reference |
+| Production persistence adapter | `PRODUCTION_PERSISTENCE_CONTRACT_V1.md` | DESIGNED |
+| Outbox | `OUTBOX_CONTRACT_V1.md` | DESIGNED / IMPLEMENTED |
+| Outbox storage / lease | `OUTBOX_STORAGE_CONTRACT.md` | DESIGNED / IMPLEMENTED reference |
+| Notification provider | `NOTIFICATION_PROVIDER_CONTRACT_V1.md` | DESIGNED |
+| Retry policy | `RETRY_POLICY_CONTRACT_V1.md` | DESIGNED |
+| Queue / broker | `QUEUE_BROKER_BOUNDARY.md` | DESIGNED / OPTIONAL |
+
+These contracts define boundaries; they do not claim that every production adapter is already implemented. Production readiness requires the relevant adapter implementation, integration tests, operational verification, and GREEN CI evidence.
