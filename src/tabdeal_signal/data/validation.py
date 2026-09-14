@@ -12,6 +12,8 @@ class ValidationIssue:
     detail: str
 
     def __post_init__(self) -> None:
+        if not isinstance(self.code, str) or not isinstance(self.detail, str):
+            raise ValueError("validation issue code and detail must be strings")
         if not self.code.strip() or not self.detail.strip():
             raise ValueError("validation issue code and detail are required")
 
@@ -22,6 +24,10 @@ class ValidationReport:
     issues: tuple[ValidationIssue, ...]
 
     def __post_init__(self) -> None:
+        if not isinstance(self.valid, bool):
+            raise ValueError("valid must be a bool")
+        if not isinstance(self.issues, tuple) or any(not isinstance(issue, ValidationIssue) for issue in self.issues):
+            raise ValueError("issues must be a tuple of ValidationIssue")
         if self.valid and self.issues:
             raise ValueError("a valid report cannot contain issues")
         if not self.valid and not self.issues:
@@ -30,6 +36,11 @@ class ValidationReport:
 
 def validate_snapshot(request: SnapshotRequest, snapshot: MarketSnapshot) -> ValidationReport:
     """Validate critical market-data integrity without network or clock access."""
+    if not isinstance(request, SnapshotRequest):
+        raise ValueError("request must be a SnapshotRequest")
+    if not isinstance(snapshot, MarketSnapshot):
+        raise ValueError("snapshot must be a MarketSnapshot")
+
     issues: list[ValidationIssue] = []
 
     if snapshot.reference_time != request.reference_time:
