@@ -82,3 +82,39 @@ def test_long_and_short_evaluators_are_isolated():
     assert short_result.direction is Direction.SHORT
     assert short_result.eligible is False
     assert short_result.reason_code == "TREND_LONG_CONFIRMED"
+
+
+def test_strategy_evaluation_blocks_when_1h_bos_is_missing():
+    request_value = request()
+    snapshot = request_value.snapshot
+
+    modified_candles = tuple(
+        Candle(
+            c.symbol,
+            c.timeframe,
+            c.open_time,
+            c.close_time,
+            c.open,
+            c.high,
+            c.low,
+            19.0 if c.timeframe == "1h" and c.open_time == BASE + timedelta(hours=53) else c.close,
+            c.volume,
+        )
+        for c in snapshot.candles
+    )
+    modified_snapshot = MarketSnapshot(
+        snapshot.snapshot_id,
+        snapshot.source_id,
+        snapshot.reference_time,
+        modified_candles,
+    )
+    modified_request = StrategyEvaluationRequest(
+        request_value.context,
+        modified_snapshot,
+    )
+
+    evaluator = MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction=Direction.LONG)
+    result = evaluator.evaluate(modified_request)
+
+    assert result.eligible is False
+    assert result.reason_code == "ENTRY_NOT_CONFIRMED"
