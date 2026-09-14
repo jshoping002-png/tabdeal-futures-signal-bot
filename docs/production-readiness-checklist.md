@@ -21,6 +21,8 @@ This checklist applies to the signal-generation and signal-notification system o
 
 ## Not yet verified for production
 
+- [ ] At least one production-like read-only data-source adapter has been implemented and exercised.
+- [ ] Adapter behavior has evidence for timeout, rate-limit, malformed-payload, stale-data, gap, and provider-error handling.
 - [ ] Durable production deployment and restart recovery have been exercised.
 - [ ] Real transport delivery, timeout, retry, and dead-letter behavior have been exercised in an approved environment.
 - [ ] Production metrics and alerting are collecting the required outbox signals.
