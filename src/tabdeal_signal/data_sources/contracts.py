@@ -102,6 +102,8 @@ class NormalizedSnapshot:
             raise ValueError("metadata must be DataSnapshotMetadata")
         if not isinstance(self.values, Mapping):
             raise ValueError("values must be a mapping")
+        if any(not isinstance(key, str) for key in self.values):
+            raise ValueError("values keys must be strings")
 
 
 class ReadOnlyDataSource(Protocol):
