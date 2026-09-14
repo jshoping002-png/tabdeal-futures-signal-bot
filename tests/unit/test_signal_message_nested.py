@@ -130,3 +130,18 @@ def test_formatter_does_not_mutate_signal_payload() -> None:
     format_rich_signal_notification(payload)
 
     assert payload == original
+
+
+def test_formatter_is_deterministic_for_identical_payloads() -> None:
+    payload = {
+        "signal": {
+            "symbol": "BTCUSDT",
+            "direction": "LONG",
+            "recommended_leverage": 5,
+            "entry": 100,
+            "stop_loss": 95,
+            "take_profit_1": 105,
+        }
+    }
+
+    assert format_rich_signal_notification(payload) == format_rich_signal_notification(payload)
