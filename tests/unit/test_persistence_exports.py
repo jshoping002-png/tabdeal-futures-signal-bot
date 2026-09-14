@@ -4,6 +4,7 @@ from tabdeal_signal.persistence import (
     PersistenceResult,
     SQLiteDecisionPersistence,
 )
+from tabdeal_signal.persistence import __all__ as persistence_exports
 from tabdeal_signal.persistence.contracts import (
     DecisionPersistence as module_protocol,
     PersistenceRequest as module_request,
@@ -24,3 +25,12 @@ def test_persistence_package_exports_are_usable_symbols() -> None:
     assert PersistenceRequest is not None
     assert PersistenceResult is not None
     assert callable(SQLiteDecisionPersistence)
+
+
+def test_persistence_package_exports_are_explicit_and_stable() -> None:
+    assert persistence_exports == [
+        "DecisionPersistence",
+        "PersistenceRequest",
+        "PersistenceResult",
+        "SQLiteDecisionPersistence",
+    ]
