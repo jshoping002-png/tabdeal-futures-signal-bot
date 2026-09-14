@@ -1,3 +1,4 @@
+import tabdeal_signal.notifications as notifications
 from tabdeal_signal.notifications import (
     NotificationTransport,
     format_rich_signal_notification,
@@ -33,3 +34,11 @@ def test_notification_exports_match_implementation_symbols() -> None:
     assert NotificationTransport is module_transport
     assert format_signal_notification is module_formatter
     assert format_rich_signal_notification is module_rich_formatter
+
+
+def test_notification_all_declares_only_supported_public_symbols() -> None:
+    assert notifications.__all__ == [
+        "NotificationTransport",
+        "format_rich_signal_notification",
+        "format_signal_notification",
+    ]
