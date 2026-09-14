@@ -120,4 +120,4 @@ class MultiTimeframeStrategyEvaluator(StrategyEvaluator):
         if not any(event[1] is self.direction and event[0] > latest_bos[0] for event in breakout_events):
             return StrategyEvaluation(self.direction, False, "ENTRY_NOT_CONFIRMED")
         reason = "ENTRY_BREAKOUT_LONG" if self.direction is Direction.LONG else "ENTRY_BREAKOUT_SHORT"
-        return StrategyEvaluation(self.direction, True, reason
+        return StrategyEvaluation(self.direction, True, reason)
