@@ -9,6 +9,15 @@ def _line(label: str, value: object) -> str:
     return f"{label}: {value if value is not None else 'N/A'}"
 
 
+def _format_leverage(value: object) -> object:
+    """Render leverage consistently without producing values such as ``3xx``."""
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip().lower().endswith("x"):
+        return value.strip()
+    return f"{value}x"
+
+
 def format_rich_signal_notification(payload: Mapping[str, object]) -> str:
     """Format a deterministic Telegram message without secrets or trade execution.
 
@@ -39,7 +48,7 @@ def format_rich_signal_notification(payload: Mapping[str, object]) -> str:
         _line("💱 Symbol", source.get("symbol")),
         _line("🏦 Exchange", source.get("exchange")),
         _line("📄 Contract", source.get("contract_type", "Perpetual")),
-        _line("⚡ Recommended leverage", f"{leverage}x" if leverage is not None else None),
+        _line("⚡ Recommended leverage", _format_leverage(leverage)),
         _line("⚠️ Risk", risk),
         _line(f"{market_icon} Market state", market),
         _line("🎯 Entry", source.get("entry", source.get("entry_price"))),
