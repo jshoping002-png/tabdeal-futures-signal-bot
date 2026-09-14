@@ -5,11 +5,12 @@ from tabdeal_signal.domain.contracts import Candle, UTC
 
 
 def make_candle(open_time: datetime, timeframe: str = "1h") -> Candle:
+    duration = timedelta(hours=1) if timeframe == "1h" else timedelta(hours=4)
     return Candle(
         symbol="BTCUSDT",
         timeframe=timeframe,
         open_time=open_time,
-        close_time=open_time + timedelta(hours=1),
+        close_time=open_time + duration,
         open=100.0,
         high=110.0,
         low=90.0,
