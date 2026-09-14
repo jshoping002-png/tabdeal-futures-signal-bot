@@ -167,7 +167,7 @@ class SQLiteDecisionPersistence:
                         locked_until = ?,
                         updated_at = ?,
                         last_error = NULL
-                    WHERE eveWHERE rowid = ?nt_id = ?
+                    WHERE rowid = ?
                     """,
                    (locked_until, current, row["internal_id"])
                 )
