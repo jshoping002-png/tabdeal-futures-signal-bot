@@ -14,7 +14,26 @@ class NotificationTransport(Protocol):
 
 
 def format_signal_notification(payload: Mapping[str, object]) -> str:
-    """Create a deterministic, secret-free text representation of a signal payload."""
-    decision = payload.get("decision")
+    """Create a deterministic, secret-free text representation of a signal payload.
+
+    Persistence payloads contain the final decision under ``decision`` and, for
+    signal outcomes, the selected signal under ``decision.signal``. A flat
+    ``decision`` value remains supported for compatibility with older payloads.
+    """
     status = payload.get("status", "SIGNAL")
-    return f"SIGNAL | status={status} | decision={decision!r}"
+    decision = payload.get("decision")
+
+    if isinstance(decision, Mapping):
+        signal = decision.get("signal")
+        if isinstance(signal, Mapping):
+            direction = signal.get("direction")
+            if direction is not None:
+                decision_text = repr(direction)
+            else:
+                decision_text = repr(signal)
+        else:
+            decision_text = repr(decision)
+    else:
+        decision_text = repr(decision)
+
+    return f"SIGNAL | status={status} | decision={decision_text}"
