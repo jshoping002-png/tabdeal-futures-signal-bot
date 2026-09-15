@@ -91,4 +91,6 @@ def test_strategy_request_is_immutable() -> None:
     snapshot = MarketSnapshot("snap-1", "source-a", candle(1).close_time + timedelta(microseconds=1), (candle(0), candle(1)))
     request = StrategyEvaluationRequest(context(snapshot.reference_time), snapshot)
     with pytest.raises(AttributeError):
+        request.context = request.context  # type: ignore[misc]
+    with pytest.raises(AttributeError):
         request.snapshot = snapshot  # type: ignore[misc]
