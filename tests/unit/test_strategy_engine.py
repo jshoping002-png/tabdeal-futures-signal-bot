@@ -2,7 +2,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tabdeal_signal.domain.contracts import Candle, Direction
+from tabdeal_signal.data.contracts import MarketSnapshot
+from tabdeal_signal.domain.contracts import Candle, DecisionContext, Direction
+from tabdeal_signal.strategy.contracts import StrategyEvaluationRequest
 from tabdeal_signal.strategy.engine import (
     MultiTimeframeStrategyEvaluator,
     _break_events,
@@ -165,3 +167,27 @@ def test_evaluator_preserves_symbol_and_direction_configuration():
     evaluator = MultiTimeframeStrategyEvaluator(symbol=" BTCUSDT ", direction=Direction.SHORT)
     assert evaluator.symbol == " BTCUSDT "
     assert evaluator.direction is Direction.SHORT
+
+
+def test_evaluator_blocks_when_any_required_timeframe_is_missing():
+    opened_at = datetime(2026, 1, 1, tzinfo=UTC)
+    candle = Candle("BTCUSDT", "15m", opened_at, opened_at + timedelta(minutes=15), 1, 2, 1, 1.5, 1)
+    snapshot = MarketSnapshot(
+        "snap-1",
+        "source-a",
+        candle.close_time + timedelta(microseconds=1),
+        (candle,),
+    )
+    context = DecisionContext(
+        decision_time=snapshot.reference_time,
+        reference_time=snapshot.reference_time,
+        snapshot_id="snap-1",
+        config_version="config-1",
+    )
+    request = StrategyEvaluationRequest(context, snapshot)
+
+    result = MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction=Direction.LONG).evaluate(request)
+
+    assert result.direction is Direction.LONG
+    assert result.eligible is False
+    assert result.reason_code == "INSUFFICIENT_SWING_CONTEXT"
