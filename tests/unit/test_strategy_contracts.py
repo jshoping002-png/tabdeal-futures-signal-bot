@@ -67,6 +67,11 @@ def test_strategy_evaluation_requires_reason_code() -> None:
         StrategyEvaluation(Direction.LONG, False, "")
 
 
+def test_strategy_evaluation_rejects_whitespace_only_reason_code() -> None:
+    with pytest.raises(ValueError, match="reason_code"):
+        StrategyEvaluation(Direction.SHORT, True, "   \t\n")
+
+
 def test_strategy_evaluation_requires_direction_enum() -> None:
     with pytest.raises(ValueError, match="Direction"):
         StrategyEvaluation("LONG", True, "LONG_RULES_PASS")  # type: ignore[arg-type]
