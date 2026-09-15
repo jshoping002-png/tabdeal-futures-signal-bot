@@ -47,40 +47,19 @@ def test_strict_swing_low_is_confirmed():
 
 
 def test_four_hour_higher_high_and_higher_low_confirm_long_trend():
-    candles = tuple(
-        make_candle(
-            i,
-            high={2: 20.0, 6: 25.0}.get(i, 10.0),
-            low={4: 5.0, 8: 6.0}.get(i, 7.0),
-        )
-        for i in range(11)
-    )
+    candles = tuple(make_candle(i, high={2: 20.0, 6: 25.0}.get(i, 10.0), low={4: 5.0, 8: 6.0}.get(i, 7.0)) for i in range(11))
     reference_time = candles[-1].close_time + timedelta(minutes=1)
     assert _trend(candles, reference_time) is Direction.LONG
 
 
 def test_four_hour_lower_high_and_lower_low_confirm_short_trend():
-    candles = tuple(
-        make_candle(
-            i,
-            high={2: 20.0, 6: 15.0}.get(i, 10.0),
-            low={4: 6.0, 8: 5.0}.get(i, 7.0),
-        )
-        for i in range(11)
-    )
+    candles = tuple(make_candle(i, high={2: 20.0, 6: 15.0}.get(i, 10.0), low={4: 6.0, 8: 5.0}.get(i, 7.0)) for i in range(11))
     reference_time = candles[-1].close_time + timedelta(minutes=1)
     assert _trend(candles, reference_time) is Direction.SHORT
 
 
 def test_four_hour_mixed_structure_is_unresolved():
-    candles = tuple(
-        make_candle(
-            i,
-            high={2: 20.0, 6: 25.0}.get(i, 10.0),
-            low={4: 5.0, 8: 8.0}.get(i, 7.0),
-        )
-        for i in range(11)
-    )
+    candles = tuple(make_candle(i, high={2: 20.0, 6: 25.0}.get(i, 10.0), low={4: 5.0, 8: 8.0}.get(i, 7.0)) for i in range(11))
     reference_time = candles[-1].close_time + timedelta(minutes=1)
     assert _trend(candles, reference_time) is None
 
@@ -93,66 +72,27 @@ def test_pit_swings_excludes_confirmation_at_reference_boundary():
 
 
 def test_break_event_requires_close_strictly_beyond_confirmed_swing_high():
-    candles = tuple(
-        make_candle(
-            i,
-            high=20.0 if i == 2 else (21.0 if i == 5 else 10.0),
-            low=1.0,
-            close=21.0 if i == 5 else 5.0,
-        )
-        for i in range(7)
-    )
+    candles = tuple(make_candle(i, high=20.0 if i == 2 else (21.0 if i == 5 else 10.0), low=1.0, close=21.0 if i == 5 else 5.0) for i in range(7))
     reference_time = candles[-1].close_time + timedelta(minutes=1)
-    events = _break_events(candles, reference_time)
-    assert events == ((candles[5].close_time, Direction.LONG),)
+    assert _break_events(candles, reference_time) == ((candles[5].close_time, Direction.LONG),)
 
 
 def test_break_event_requires_close_strictly_below_confirmed_swing_low():
-    candles = tuple(
-        make_candle(
-            i,
-            high=10.0,
-            low=0.5 if i == 2 else (0.3 if i == 5 else 1.0),
-            close=0.4 if i == 5 else 7.0,
-        )
-        for i in range(7)
-    )
+    candles = tuple(make_candle(i, high=10.0, low=0.5 if i == 2 else (0.3 if i == 5 else 1.0), close=0.4 if i == 5 else 7.0) for i in range(7))
     reference_time = candles[-1].close_time + timedelta(minutes=1)
-    events = _break_events(candles, reference_time)
-    assert events == ((candles[5].close_time, Direction.SHORT),)
+    assert _break_events(candles, reference_time) == ((candles[5].close_time, Direction.SHORT),)
 
 
 def test_break_event_at_confirmation_boundary_is_not_lookahead_valid():
-    candles = tuple(
-        make_candle(
-            i,
-            high=20.0 if i == 2 else (21.0 if i == 4 else 10.0),
-            low=1.0,
-            close=21.0 if i == 4 else (20.0 if i == 2 else 5.0),
-        )
-        for i in range(7)
-    )
+    candles = tuple(make_candle(i, high=20.0 if i == 2 else (21.0 if i == 4 else 10.0), low=1.0, close=21.0 if i == 4 else (20.0 if i == 2 else 5.0)) for i in range(7))
     reference_time = candles[-1].close_time + timedelta(minutes=1)
-    events = _break_events(candles, reference_time)
-    assert events == ()
+    assert _break_events(candles, reference_time) == ()
 
 
 def test_latest_bos_and_choch_separates_trend_bos_from_later_opposite_choch():
-    candles = tuple(
-        make_candle(
-            i,
-            high=21.0 if i == 5 else (20.0 if i == 2 else 10.0),
-            low=0.0 if i == 6 else (-1.0 if i == 9 else 1.0),
-            close=21.0 if i == 5 else (-1.0 if i == 9 else 5.0),
-        )
-        for i in range(11)
-    )
+    candles = tuple(make_candle(i, high=21.0 if i == 5 else (20.0 if i == 2 else 10.0), low=0.0 if i == 6 else (-1.0 if i == 9 else 1.0), close=21.0 if i == 5 else (-1.0 if i == 9 else 5.0)) for i in range(11))
     reference_time = candles[-1].close_time + timedelta(minutes=1)
-
-    latest_bos, latest_choch = _latest_bos_and_choch(candles, reference_time, Direction.LONG)
-
-    assert latest_bos == (candles[5].close_time, Direction.LONG)
-    assert latest_choch == (candles[9].close_time, Direction.SHORT)
+    assert _latest_bos_and_choch(candles, reference_time, Direction.LONG) == ((candles[5].close_time, Direction.LONG), (candles[9].close_time, Direction.SHORT))
 
 
 def test_evaluator_rejects_empty_symbol():
@@ -180,22 +120,9 @@ def test_evaluator_preserves_symbol_and_direction_configuration():
 def test_evaluator_blocks_when_any_required_timeframe_is_missing():
     opened_at = datetime(2026, 1, 1, tzinfo=UTC)
     candle = Candle("BTCUSDT", "15m", opened_at, opened_at + timedelta(minutes=15), 1, 2, 1, 1.5, 1)
-    snapshot = MarketSnapshot(
-        "snap-1",
-        "source-a",
-        candle.close_time + timedelta(microseconds=1),
-        (candle,),
-    )
-    context = DecisionContext(
-        decision_time=snapshot.reference_time,
-        reference_time=snapshot.reference_time,
-        snapshot_id="snap-1",
-        config_version="config-1",
-    )
-    request = StrategyEvaluationRequest(context, snapshot)
-
-    result = MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction=Direction.LONG).evaluate(request)
-
+    snapshot = MarketSnapshot("snap-1", "source-a", candle.close_time + timedelta(microseconds=1), (candle,))
+    context = DecisionContext(decision_time=snapshot.reference_time, reference_time=snapshot.reference_time, snapshot_id="snap-1", config_version="config-1")
+    result = MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction=Direction.LONG).evaluate(StrategyEvaluationRequest(context, snapshot))
     assert result.direction is Direction.LONG
     assert result.eligible is False
     assert result.reason_code == "INSUFFICIENT_SWING_CONTEXT"
@@ -203,9 +130,8 @@ def test_evaluator_blocks_when_any_required_timeframe_is_missing():
 
 def test_pit_swings_rejects_naive_reference_time():
     candles = tuple(make_candle(i, high=20.0 if i == 2 else 10.0) for i in range(5))
-    swings = _confirmed_swings(candles, high=True)
     with pytest.raises(ValueError, match="timezone-aware"):
-        _pit_swings(swings, datetime(2026, 1, 1))
+        _pit_swings(_confirmed_swings(candles, high=True), datetime(2026, 1, 1))
 
 
 def test_break_events_rejects_naive_reference_time():
@@ -218,3 +144,9 @@ def test_trend_rejects_naive_reference_time():
     candles = tuple(make_candle(i, high=20.0 if i == 2 else 10.0) for i in range(5))
     with pytest.raises(ValueError, match="timezone-aware"):
         _trend(candles, datetime(2026, 1, 1))
+
+
+def test_latest_bos_and_choch_rejects_naive_reference_time():
+    candles = tuple(make_candle(i) for i in range(5))
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _latest_bos_and_choch(candles, datetime(2026, 1, 1), Direction.LONG)
