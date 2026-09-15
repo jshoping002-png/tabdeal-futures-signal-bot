@@ -106,3 +106,15 @@ def test_strategy_request_rejects_non_string_context_snapshot_id() -> None:
             config_version="config-1",
         )
         StrategyEvaluationRequest(invalid_context, snapshot)
+
+
+def test_strategy_request_rejects_non_string_context_config_version() -> None:
+    snapshot = MarketSnapshot("snap-1", "source-a", candle(0).close_time + timedelta(microseconds=1), (candle(0),))
+    with pytest.raises(ValueError, match="snapshot_id and config_version must be strings"):
+        invalid_context = DecisionContext(
+            decision_time=snapshot.reference_time,
+            reference_time=snapshot.reference_time,
+            snapshot_id="snap-1",
+            config_version=123,  # type: ignore[arg-type]
+        )
+        StrategyEvaluationRequest(invalid_context, snapshot)
