@@ -10,6 +10,7 @@ from tabdeal_signal.strategy.engine import (
     _break_events,
     _confirmed_swings,
     _latest_bos_and_choch,
+    _pit_swings,
     _trend,
 )
 
@@ -82,6 +83,13 @@ def test_four_hour_mixed_structure_is_unresolved():
     )
     reference_time = candles[-1].close_time + timedelta(minutes=1)
     assert _trend(candles, reference_time) is None
+
+
+def test_pit_swings_excludes_confirmation_at_reference_boundary():
+    candles = tuple(make_candle(i, high=20.0 if i == 2 else 10.0) for i in range(5))
+    swings = _confirmed_swings(candles, high=True)
+    assert _pit_swings(swings, candles[4].close_time) == ()
+    assert _pit_swings(swings, candles[4].close_time + timedelta(microseconds=1)) == swings
 
 
 def test_break_event_requires_close_strictly_beyond_confirmed_swing_high():
