@@ -16,6 +16,11 @@ class SwingPoint:
     confirmed_at: datetime
 
 
+def _require_timezone_aware(value: datetime) -> None:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("reference_time must be timezone-aware")
+
+
 def _confirmed_swings(candles: tuple[Candle, ...], *, high: bool) -> tuple[SwingPoint, ...]:
     points: list[SwingPoint] = []
     for index in range(2, len(candles) - 2):
@@ -31,10 +36,12 @@ def _confirmed_swings(candles: tuple[Candle, ...], *, high: bool) -> tuple[Swing
 
 
 def _pit_swings(points: tuple[SwingPoint, ...], reference_time: datetime) -> tuple[SwingPoint, ...]:
+    _require_timezone_aware(reference_time)
     return tuple(point for point in points if point.confirmed_at < reference_time)
 
 
 def _trend(candles: tuple[Candle, ...], reference_time: datetime) -> Direction | None:
+    _require_timezone_aware(reference_time)
     highs = _pit_swings(_confirmed_swings(candles, high=True), reference_time)
     lows = _pit_swings(_confirmed_swings(candles, high=False), reference_time)
     if len(highs) < 2 or len(lows) < 2:
@@ -49,6 +56,7 @@ def _trend(candles: tuple[Candle, ...], reference_time: datetime) -> Direction |
 
 
 def _break_events(candles: tuple[Candle, ...], reference_time: datetime) -> tuple[tuple[datetime, Direction], ...]:
+    _require_timezone_aware(reference_time)
     highs = _confirmed_swings(candles, high=True)
     lows = _confirmed_swings(candles, high=False)
     events: list[tuple[datetime, Direction]] = []
