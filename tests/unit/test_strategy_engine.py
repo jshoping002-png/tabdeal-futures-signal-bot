@@ -212,3 +212,9 @@ def test_break_events_rejects_naive_reference_time():
     candles = tuple(make_candle(i, high=20.0 if i == 2 else 10.0) for i in range(5))
     with pytest.raises(ValueError, match="timezone-aware"):
         _break_events(candles, datetime(2026, 1, 1))
+
+
+def test_trend_rejects_naive_reference_time():
+    candles = tuple(make_candle(i, high=20.0 if i == 2 else 10.0) for i in range(5))
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _trend(candles, datetime(2026, 1, 1))
