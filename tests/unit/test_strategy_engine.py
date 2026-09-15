@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from tabdeal_signal.domain.contracts import Candle, Direction
 from tabdeal_signal.strategy.engine import (
+    MultiTimeframeStrategyEvaluator,
     _break_events,
     _confirmed_swings,
     _latest_bos_and_choch,
@@ -140,3 +143,13 @@ def test_latest_bos_and_choch_separates_trend_bos_from_later_opposite_choch():
 
     assert latest_bos == (candles[5].close_time, Direction.LONG)
     assert latest_choch == (candles[9].close_time, Direction.SHORT)
+
+
+def test_evaluator_rejects_empty_symbol():
+    with pytest.raises(ValueError):
+        MultiTimeframeStrategyEvaluator(symbol="", direction=Direction.LONG)
+
+
+def test_evaluator_rejects_non_direction_value():
+    with pytest.raises(ValueError):
+        MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction="LONG")
