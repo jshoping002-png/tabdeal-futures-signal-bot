@@ -55,6 +55,13 @@ def test_strategy_evaluation_is_immutable_and_maps_to_side_decision() -> None:
         result.eligible = False  # type: ignore[misc]
 
 
+def test_strategy_evaluation_maps_reason_code_without_mutation() -> None:
+    result = StrategyEvaluation(Direction.LONG, True, "LONG_RULES_PASS")
+    decision = result.to_side_decision()
+    assert decision.reason_code == "LONG_RULES_PASS"
+    assert decision.direction is Direction.LONG
+
+
 def test_blocked_strategy_maps_to_blocked_side_decision() -> None:
     result = StrategyEvaluation(Direction.SHORT, False, "SHORT_DATA_INSUFFICIENT")
     decision = result.to_side_decision()
