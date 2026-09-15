@@ -153,3 +153,9 @@ def test_evaluator_rejects_empty_symbol():
 def test_evaluator_rejects_non_direction_value():
     with pytest.raises(ValueError):
         MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction="LONG")
+
+
+def test_evaluator_rejects_invalid_request_type():
+    evaluator = MultiTimeframeStrategyEvaluator(symbol="BTCUSDT", direction=Direction.LONG)
+    with pytest.raises(ValueError, match="request must be a StrategyEvaluationRequest"):
+        evaluator.evaluate(object())
