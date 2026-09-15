@@ -75,6 +75,7 @@ def _break_events(candles: tuple[Candle, ...], reference_time: datetime) -> tupl
 def _latest_bos_and_choch(
     candles: tuple[Candle, ...], reference_time: datetime, direction: Direction
 ):
+    _require_timezone_aware(reference_time)
     events = _break_events(candles, reference_time)
     same_direction = tuple(event for event in events if event[1] is direction)
     if not same_direction:
