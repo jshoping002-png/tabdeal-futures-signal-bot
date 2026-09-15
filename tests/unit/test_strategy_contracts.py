@@ -30,6 +30,12 @@ def test_strategy_request_requires_matching_reference_time() -> None:
         StrategyEvaluationRequest(mismatched, snapshot)
 
 
+def test_strategy_request_requires_matching_snapshot_id() -> None:
+    snapshot = MarketSnapshot("snap-2", "source-a", candle(0).close_time + timedelta(microseconds=1), (candle(0),))
+    with pytest.raises(ValueError, match="snapshot_id"):
+        StrategyEvaluationRequest(context(snapshot.reference_time), snapshot)
+
+
 def test_strategy_request_rejects_non_decision_context() -> None:
     snapshot = MarketSnapshot("snap-1", "source-a", candle(0).close_time + timedelta(microseconds=1), (candle(0),))
     with pytest.raises(ValueError, match="DecisionContext"):
