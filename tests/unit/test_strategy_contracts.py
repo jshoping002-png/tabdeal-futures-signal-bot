@@ -104,5 +104,5 @@ def test_strategy_request_rejects_non_string_context_snapshot_id() -> None:
         snapshot_id=123,  # type: ignore[arg-type]
         config_version="config-1",
     )
-    with pytest.raises(ValueError, match="snapshot_id"):
+    with pytest.raises(ValueError, match="snapshot_id and config_version must be strings"):
         StrategyEvaluationRequest(invalid_context, snapshot)
