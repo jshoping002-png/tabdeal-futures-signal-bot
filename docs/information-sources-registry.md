@@ -50,6 +50,37 @@ This document formally defines the planned information sources for the signal-an
 | **7 — Persistence, audit and replay** | Snapshots and provenance from Binance/Bybit/other approved read-only sources; CFTC COT reports used in decisions; CoinMarketCap data used in decisions; ECB data used in decisions; BIS data used in decisions; Eurostat data used in decisions; OECD data used in decisions; Federal Reserve Bank of New York data used in decisions; TradingView data if approved; macro releases; news/events used in decisions; context indicators; decision and rule-version records |
 | **8 — Monitoring and operational readiness** | Health, freshness, latency and error metrics for every implemented source; API availability; macro/news ingestion health; context-series freshness; CI, runtime logs, audit and replay evidence |
 
+## Data-domain classification
+
+Lifecycle phase and data type are intentionally separate dimensions. The `Initial phase` column above describes **project/system lifecycle placement**; it does not classify the kind of data supplied by a source.
+
+The authoritative data-domain taxonomy is defined in `docs/information-source-data-classification-v1.md` and uses the following classes:
+
+1. Primary Market Data
+2. Derivatives Market Data
+3. Order Flow / Liquidity
+4. Aggregated Market Context
+5. Positioning
+6. Macro / Economic Data
+7. Monetary Policy / Central-Bank Events
+8. Money Market / Rates / Liquidity
+9. Cross-Asset Market Context
+10. News / Events
+11. On-chain / Whale Activity
+12. Options / Volatility
+
+A source can therefore participate in multiple lifecycle phases without changing its data-domain classification. Dataset/field-level authorization remains separate from source registration.
+
+## Allowed-consumer rule
+
+Data-domain classification does not grant decision authority. Decision use follows:
+
+`Source → Data Domain → Dataset/Field → PIT/Timing → Validation → Allowed Consumer → Decision Use`
+
+Missing or ambiguous timing, provenance, semantics, validation, or consumer authorization blocks decision use. In particular, the existence of derivatives, order-book, positioning, macro, news, on-chain, options, or aggregated fields does not by itself authorize LONG/SHORT strategy use.
+
+The repository currently has no approved `STRATEGY_CONTRACT_V1.md`; therefore this classification does not mark any newly classified external source as an active strategy input.
+
 ## Required source-level controls
 
 Every implemented source must define:
@@ -70,5 +101,7 @@ Every implemented source must define:
 ## Important status note
 
 This registry records the planned source architecture. It does **not** claim that live adapters are implemented or that external source access has been verified for production. The current repository contains read-only contracts and a static data source; real external adapters remain planned work.
+
+No source was removed by the data-domain classification. No provider was activated. No strategy rule was added. No execution capability was added.
 
 **Production readiness = NOT VERIFIED**
