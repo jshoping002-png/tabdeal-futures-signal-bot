@@ -71,6 +71,8 @@ The authoritative data-domain taxonomy is defined in `docs/information-source-da
 
 A source can therefore participate in multiple lifecycle phases without changing its data-domain classification. Dataset/field-level authorization remains separate from source registration.
 
+For the current source-by-source mapping, including dataset/field scope, allowed consumer and PIT/decision status, see `docs/information-source-data-to-consumer-mapping-v1.md`.
+
 ## Allowed-consumer rule
 
 Data-domain classification does not grant decision authority. Decision use follows:
