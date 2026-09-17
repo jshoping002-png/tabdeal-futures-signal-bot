@@ -19,6 +19,11 @@ from .endpoint_contracts import (
     endpoint_contracts_for,
     source_ids_with_endpoint_contracts,
 )
+from .endpoint_contract_validation import (
+    EndpointValidationResult,
+    endpoint_catalog_counts,
+    validate_endpoint_catalog,
+)
 from .operational_manifest import (
     SOURCE_OPERATIONAL_MANIFEST,
     SourceOperationalManifest,
@@ -61,6 +66,7 @@ __all__ = [
     "AdapterValidationResult",
     "EndpointContract",
     "EndpointExactness",
+    "EndpointValidationResult",
     "FIXTURE_FORMAT_VERSION",
     "KNOWN_RUNTIME_SOURCE_HOSTS",
     "ReadinessGate",
@@ -79,6 +85,7 @@ __all__ = [
     "adapter_bindings_for",
     "all_source_readiness",
     "build_runtime_source",
+    "endpoint_catalog_counts",
     "endpoint_contracts_for",
     "explicit_runtime_endpoint_config",
     "get_source_access_spec",
@@ -92,6 +99,7 @@ __all__ = [
     "source_ids_with_endpoint_contracts",
     "source_readiness_counts",
     "source_readiness_for",
+    "validate_endpoint_catalog",
     "validate_operational_manifest",
     "validate_source_adapter_catalog",
 ]
