@@ -18,6 +18,22 @@ _FORBIDDEN_AUTH_KEYS = {
 }
 
 
+def _host_is_within(hostname: str, allowed_hosts: tuple[str, ...]) -> bool:
+    normalized = hostname.strip().lower()
+    return any(normalized == host or normalized.endswith("." + host) for host in allowed_hosts)
+
+
+def _validate_host_values(hosts: tuple[str, ...]) -> tuple[str, ...]:
+    if not isinstance(hosts, tuple) or not hosts or any(
+        not isinstance(host, str) or not host.strip() for host in hosts
+    ):
+        raise ValueError("allowed_hosts must contain non-empty hosts")
+    normalized = tuple(host.strip().lower() for host in hosts)
+    if any(host.startswith(".") or "/" in host or "@" in host or host == "*" for host in normalized):
+        raise ValueError("allowed_hosts must contain hostname values only")
+    return normalized
+
+
 @dataclass(frozen=True, slots=True)
 class RuntimeEndpointConfig:
     source_id: str
@@ -29,21 +45,19 @@ class RuntimeEndpointConfig:
             raise ValueError("source_id must be non-empty")
         if not isinstance(self.endpoint, str) or not self.endpoint.strip():
             raise ValueError("endpoint must be non-empty")
-        if not isinstance(self.allowed_hosts, tuple) or not self.allowed_hosts or any(
-            not isinstance(host, str) or not host.strip() for host in self.allowed_hosts
-        ):
-            raise ValueError("allowed_hosts must contain non-empty hosts")
+        allowed_hosts = _validate_host_values(self.allowed_hosts)
         parsed = urlparse(self.endpoint.strip())
         if parsed.scheme != "https" or not parsed.hostname:
             raise ValueError("runtime source endpoint must be HTTPS")
         if parsed.username is not None or parsed.password is not None:
             raise ValueError("runtime endpoint must not contain URL userinfo")
         hostname = parsed.hostname.lower()
-        allowed = tuple(host.strip().lower() for host in self.allowed_hosts)
-        if hostname not in allowed and not any(hostname.endswith("." + host) for host in allowed):
+        if not _host_is_within(hostname, allowed_hosts):
             raise ValueError("runtime endpoint host is outside the configured source scope")
         if any(key.strip().lower() in _FORBIDDEN_AUTH_KEYS for key, _ in parse_qsl(parsed.query, keep_blank_values=True)):
             raise ValueError("runtime endpoint must not contain authentication material")
+        object.__setattr__(self, "endpoint", self.endpoint.strip())
+        object.__setattr__(self, "allowed_hosts", allowed_hosts)
 
 
 KNOWN_RUNTIME_SOURCE_HOSTS: dict[str, tuple[str, ...]] = {
@@ -80,7 +94,11 @@ def explicit_runtime_endpoint_config(
 ) -> RuntimeEndpointConfig:
     if source_id not in RUNTIME_CONFIGURED_SOURCE_IDS:
         raise KeyError(source_id)
-    return RuntimeEndpointConfig(source_id, endpoint, allowed_hosts)
+    normalized_allowed = _validate_host_values(allowed_hosts)
+    known_hosts = KNOWN_RUNTIME_SOURCE_HOSTS.get(source_id)
+    if known_hosts and any(not _host_is_within(host, known_hosts) for host in normalized_allowed):
+        raise ValueError("explicit runtime host allowlist escapes the source's known host scope")
+    return RuntimeEndpointConfig(source_id, endpoint, normalized_allowed)
 
 
 __all__ = [
