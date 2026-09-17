@@ -42,6 +42,11 @@ from .source_access import (
     get_source_access_spec,
     source_ids,
 )
+from .source_adapter_validation import (
+    AdapterValidationResult,
+    source_adapter_validation_counts,
+    validate_source_adapter_catalog,
+)
 from .source_readiness import (
     ReadinessGate,
     SourceReadiness,
@@ -53,6 +58,7 @@ from .source_readiness import (
 
 __all__ = [
     "AdapterBinding",
+    "AdapterValidationResult",
     "EndpointContract",
     "EndpointExactness",
     "FIXTURE_FORMAT_VERSION",
@@ -80,10 +86,12 @@ __all__ = [
     "operational_manifest_for",
     "resolve_adapter_class",
     "runtime_endpoint_config",
+    "source_adapter_validation_counts",
     "source_ids",
     "source_ids_with_adapters",
     "source_ids_with_endpoint_contracts",
     "source_readiness_counts",
     "source_readiness_for",
     "validate_operational_manifest",
+    "validate_source_adapter_catalog",
 ]
