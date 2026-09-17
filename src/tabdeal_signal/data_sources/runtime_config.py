@@ -1,0 +1,90 @@
+"""Validated runtime configuration for unresolved public source endpoints.
+
+The existing source reports deliberately leave some endpoint details unresolved.
+This module provides a strict, non-secret runtime boundary for supplying those
+URLs without adding guessed endpoints to source control.
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from urllib.parse import parse_qsl, urlparse
+
+from .source_access import VERIFIED_SOURCE_ACCESS_SPECS
+
+
+_FORBIDDEN_AUTH_KEYS = {
+    "api_key", "apikey", "api-key", "secret", "signature",
+    "access_token", "auth_token", "authorization", "bearer",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimeEndpointConfig:
+    source_id: str
+    endpoint: str
+    allowed_hosts: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.source_id, str) or not self.source_id.strip():
+            raise ValueError("source_id must be non-empty")
+        if not isinstance(self.endpoint, str) or not self.endpoint.strip():
+            raise ValueError("endpoint must be non-empty")
+        if not isinstance(self.allowed_hosts, tuple) or not self.allowed_hosts or any(
+            not isinstance(host, str) or not host.strip() for host in self.allowed_hosts
+        ):
+            raise ValueError("allowed_hosts must contain non-empty hosts")
+        parsed = urlparse(self.endpoint.strip())
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise ValueError("runtime source endpoint must be HTTPS")
+        hostname = parsed.hostname.lower()
+        allowed = tuple(host.strip().lower() for host in self.allowed_hosts)
+        if hostname not in allowed and not any(hostname.endswith("." + host) for host in allowed):
+            raise ValueError("runtime endpoint host is outside the configured source scope")
+        if any(key.strip().lower() in _FORBIDDEN_AUTH_KEYS for key, _ in parse_qsl(parsed.query, keep_blank_values=True)):
+            raise ValueError("runtime endpoint must not contain authentication material")
+
+
+KNOWN_RUNTIME_SOURCE_HOSTS: dict[str, tuple[str, ...]] = {
+    spec.source_id: spec.verified_hosts
+    for spec in VERIFIED_SOURCE_ACCESS_SPECS
+    if spec.verified_hosts
+}
+
+RUNTIME_CONFIGURED_SOURCE_IDS: tuple[str, ...] = (
+    "binance-spot-market-data",
+    "us-treasury-daily-interest-rates",
+    "sec-edgar-public-api",
+    "okx-market-data",
+    "coinbase-advanced-trade-market-data",
+    "cftc-public-reporting",
+    "coinmarketcap-keyless-public-api",
+    "bis-statistics-api",
+    "eurostat-rest-sdmx-api",
+    "ny-fed-markets-data",
+)
+
+
+def runtime_endpoint_config(source_id: str, endpoint: str) -> RuntimeEndpointConfig:
+    if source_id not in RUNTIME_CONFIGURED_SOURCE_IDS:
+        raise KeyError(source_id)
+    allowed_hosts = KNOWN_RUNTIME_SOURCE_HOSTS.get(source_id)
+    if not allowed_hosts:
+        raise ValueError("source requires an explicit runtime host allowlist")
+    return RuntimeEndpointConfig(source_id, endpoint, allowed_hosts)
+
+
+def explicit_runtime_endpoint_config(
+    source_id: str, endpoint: str, allowed_hosts: tuple[str, ...]
+) -> RuntimeEndpointConfig:
+    if source_id not in RUNTIME_CONFIGURED_SOURCE_IDS:
+        raise KeyError(source_id)
+    return RuntimeEndpointConfig(source_id, endpoint, allowed_hosts)
+
+
+__all__ = [
+    "KNOWN_RUNTIME_SOURCE_HOSTS",
+    "RUNTIME_CONFIGURED_SOURCE_IDS",
+    "RuntimeEndpointConfig",
+    "explicit_runtime_endpoint_config",
+    "runtime_endpoint_config",
+]
