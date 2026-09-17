@@ -144,15 +144,11 @@ class BybitOrderbookDataSource(ReadOnlyDataSource):
             return self._failure(
                 topic, self._safe_now(), "invalid_payload", str(exc)
             )
-        except Exception as exc:
-            return self._failure(
-                topic, self._safe_now(), "unexpected_error", type(exc).__name__
-            )
 
         ret_code = payload.get("retCode")
-        if not isinstance(ret_code, int):
+        if type(ret_code) is not int:
             return self._failure(
-                topic, received_at, "schema_error", "missing_retCode"
+                topic, received_at, "schema_error", "missing_or_non_integer_retCode"
             )
         if ret_code != 0:
             ret_msg = payload.get("retMsg")
@@ -211,7 +207,7 @@ class BybitOrderbookDataSource(ReadOnlyDataSource):
         if symbol != self.symbol:
             raise ValueError("response symbol mismatch")
         if not all(
-            isinstance(value, int)
+            type(value) is int
             for value in (ts, update_id, cross_sequence, matching_timestamp)
         ):
             raise ValueError("timestamp/update fields must be integers")
@@ -244,6 +240,8 @@ class BybitOrderbookDataSource(ReadOnlyDataSource):
                 size = Decimal(str(row[1]))
             except (InvalidOperation, ValueError) as exc:
                 raise ValueError("invalid orderbook numeric value") from exc
+            if not price.is_finite() or not size.is_finite():
+                raise ValueError("orderbook numeric values must be finite")
             if price < 0 or size < 0:
                 raise ValueError("orderbook numeric values must be non-negative")
             levels.append((price, size))
