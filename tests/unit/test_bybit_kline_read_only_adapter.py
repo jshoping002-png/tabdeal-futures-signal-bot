@@ -52,6 +52,17 @@ def test_valid_response_is_pit_safe_and_deterministically_ordered():
     assert transport.calls[0][1]["interval"] == "60"
 
 
+def test_response_received_after_reference_time_is_rejected():
+    transport = FakeTransport(
+        payload(),
+        received_at=REFERENCE.replace(hour=2, minute=0, second=1),
+    )
+    source = BybitKlineDataSource("BTCUSDT", transport=transport)
+
+    with pytest.raises(ValueError, match="received after reference_time"):
+        source.snapshot(request())
+
+
 def test_open_candle_is_excluded_at_exact_close_boundary():
     open_candle = ["1767229200000", "105", "110", "100", "108", "1", "108"]
     snapshot = make_source(payload(ROWS + [open_candle])).snapshot(request())
