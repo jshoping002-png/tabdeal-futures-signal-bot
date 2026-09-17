@@ -1,7 +1,7 @@
 """Concrete import bindings for the read-only adapters recorded in source access.
 
-This registry only proves that an adapter class has a stable module binding. It does
-not promote a source to LIVE_VERIFIED, PRODUCTION_READY, or ACTIVE.
+This registry proves only that each declared adapter class has a stable module binding.
+It does not promote a source to LIVE_VERIFIED, PRODUCTION_READY, or ACTIVE.
 """
 from __future__ import annotations
 
@@ -9,11 +9,10 @@ from dataclasses import dataclass
 from importlib import import_module
 from typing import TypeAlias
 
-from .contracts import ReadOnlyDataSource
 from .source_access import VERIFIED_SOURCE_ACCESS_SPECS
 
 
-AdapterClass: TypeAlias = type[ReadOnlyDataSource]
+AdapterClass: TypeAlias = type[object]
 
 
 @dataclass(frozen=True, slots=True)
@@ -92,10 +91,8 @@ def resolve_adapter_class(source_id: str, class_name: str) -> AdapterClass:
             adapter = getattr(module, class_name, None)
             if adapter is None:
                 raise LookupError(f"adapter class not found: {class_name}")
-            if not callable(adapter):
-                raise TypeError(f"adapter class is not callable: {class_name}")
-            if not hasattr(adapter, "fetch_snapshot"):
-                raise TypeError(f"adapter lacks fetch_snapshot: {class_name}")
+            if not isinstance(adapter, type):
+                raise TypeError(f"adapter binding is not a class: {class_name}")
             return adapter
     raise KeyError((source_id, class_name))
 
