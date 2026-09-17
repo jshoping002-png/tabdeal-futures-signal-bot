@@ -1,56 +1,26 @@
 # Source Operationalization Ledger — Reports 001–2040
 
-## Purpose
+This is an operational status ledger for the already-existing source-verification work. It does **not** create new source reports.
 
-This ledger operationalizes the existing source-verification history through report 2040.
-It is not a new source-verification report. It records which already-documented source
-families have a bounded adapter surface in code and which still require exact endpoint
-or provider-contract work.
-
-## Rules
-
-- `DOCUMENTED` means the existing reports establish a public/documented source boundary,
-  but no bounded adapter is claimed here.
-- `ADAPTER_BUILT` means an existing read-only adapter class now provides an explicit,
-  bounded envelope for the stated scope; it does not imply live verification or production readiness.
-- No row authorizes strategy consumption.
-- No row enables orders, accounts, balances, positions, leverage, or trade execution.
-- Exact endpoints, series identifiers, PIT semantics, rate limits, reconnect behavior and
-  provider failure semantics remain required wherever the underlying report left them unresolved.
-
-## Existing source families
-
-| Source | Verification record(s) | Lifecycle | Bounded adapter scope |
+| Source | Reports | Lifecycle | Implemented read-only scope |
 |---|---|---|---|
-| Binance Futures Market Data | 001 | DOCUMENTED | Continuous-contract kline documentation only; exact project endpoint contract pending |
-| Bybit Futures Market Data | 001, 2040 | ADAPTER_BUILT | Public REST kline; public REST orderbook; public REST open interest; public REST funding rate history |
-| BLS Public Data API | 001 | ADAPTER_BUILT | Public JSON envelope; exact series/PIT contract runtime-configured |
-| Binance Spot Market Data | 002 | DOCUMENTED | Public market-data boundary |
-| Bybit Spot Market Data | 002 | ADAPTER_BUILT | Public REST kline with `category=spot` |
+| Binance Futures Market Data | 001 | ADAPTER_BUILT | Coin-M continuous-contract klines |
+| Bybit Futures Market Data | 001, 2040 | ADAPTER_BUILT | Kline, orderbook, open interest, funding history, tickers, instruments info |
+| BLS Public Data API | 001 | ADAPTER_BUILT | Public JSON envelope; exact series/PIT still runtime-configured |
+| Binance Spot Market Data | 002 | DOCUMENTED | Exact project endpoint contract pending |
+| Bybit Spot Market Data | 002 | ADAPTER_BUILT | Public kline and ticker paths |
 | U.S. Treasury Daily Interest-Rate Data | 002 | ADAPTER_BUILT | Official XML feed envelope |
 | SEC EDGAR Public APIs | 002 | ADAPTER_BUILT | Public JSON submissions/XBRL envelope |
-| OKX Market Data | 003 | DOCUMENTED | Public market-data endpoint family; exact project endpoint contract pending |
-| Kraken Futures Market Data | 003 | DOCUMENTED | Public futures candles/analytics documented |
-| Coinbase Advanced Trade Market Data | 003 | DOCUMENTED | Public Advanced Trade market-data boundary; derivatives not assumed |
-| Deribit Market Data | 003 | DOCUMENTED | Public market-data boundary |
+| OKX Market Data | 003 | DOCUMENTED | Exact project endpoint contract pending |
+| Kraken Futures Market Data | 003 | ADAPTER_BUILT | Public chart candles for documented tick types/resolutions |
+| Coinbase Advanced Trade Market Data | 003 | DOCUMENTED | Public Advanced Trade boundary; derivatives not assumed |
+| Deribit Market Data | 003 | DOCUMENTED | Exact project JSON-RPC contract still pending |
 | CFTC Public Reporting / COT | 004 | ADAPTER_BUILT | Published feed/text envelope |
 | CoinMarketCap Keyless Public API | 004 | ADAPTER_BUILT | Curated public JSON envelope; rate-limited |
 | ECB Data Portal API | 005 | ADAPTER_BUILT | Public SDMX/text envelope |
 | BIS Statistics API | 006 | ADAPTER_BUILT | Public SDMX/text envelope |
 | Eurostat REST / SDMX APIs | 006 | ADAPTER_BUILT | Public REST/SDMX text envelope |
-| OECD Data Explorer SDMX API | 007 | DOCUMENTED | Public SDMX endpoint family; exact dataset/series contract pending |
-| NY Fed Markets Data APIs | 008 | DOCUMENTED | Public markets-data API family; route-by-route auth contract pending |
+| OECD Data Explorer SDMX API | 007 | DOCUMENTED | Exact dataset/series contract pending |
+| NY Fed Markets Data APIs | 008 | DOCUMENTED | Route-by-route auth/availability contract pending |
 
-## Latest completion within the 001–2040 scope
-
-The existing report set through 2040 documents Bybit Open Interest and Funding Rate History.
-The operationalization layer now has bounded adapters for both public REST endpoints. The
-adapters preserve provider strings, timestamps, pagination cursor where supplied, provenance,
-and point-in-time rejection semantics. They do not infer units, strategy meaning, or execution behavior.
-
-## Acceptance boundary
-
-The report checkpoint through 2040 remains a verification-progress record; it explicitly
-does not activate providers or production adapters. This ledger therefore moves only the
-source families with an actual bounded code adapter to `ADAPTER_BUILT`. `LIVE_VERIFIED`,
-`PRODUCTION_READY`, and `ACTIVE` are intentionally not asserted by this file.
+No source is marked `LIVE_VERIFIED`, `PRODUCTION_READY`, or `ACTIVE`. No source row authorizes strategy use or trading execution.
