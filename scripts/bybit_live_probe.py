@@ -17,6 +17,26 @@ _INTERVAL_MINUTES = {
 _CATEGORIES = {"spot", "linear", "inverse"}
 
 
+def _validate_candles(*, rows: list[object], timeframe: str, received_at: datetime) -> tuple[int, int]:
+    interval_ms = _INTERVAL_MINUTES[timeframe] * 60 * 1000
+    received_ms = int(received_at.timestamp() * 1000)
+    closed_starts: list[int] = []
+    for row in rows:
+        if not isinstance(row, list) or len(row) < 7:
+            raise ValueError("each Kline row must contain at least 7 fields")
+        try:
+            start_ms = int(row[0])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Kline startTime must be an integer timestamp") from exc
+        if start_ms < 0:
+            raise ValueError("Kline startTime must be non-negative")
+        if start_ms + interval_ms <= received_ms:
+            closed_starts.append(start_ms)
+    if not closed_starts:
+        raise ValueError("no closed Kline candle was available at received_at")
+    return len(closed_starts), max(closed_starts)
+
+
 def probe_kline(*, symbol: str, category: str, timeframe: str, limit: int,
                 timeout_seconds: float, base_url: str = "https://api.bybit.com") -> dict[str, object]:
     symbol = symbol.strip().upper()
@@ -43,7 +63,10 @@ def probe_kline(*, symbol: str, category: str, timeframe: str, limit: int,
     }
     started = time.monotonic()
     payload, received_at = UrllibJsonTransport(base_url).get(_ENDPOINT, params, timeout_seconds)
+    received_at = received_at.astimezone(timezone.utc)
     elapsed_ms = round((time.monotonic() - started) * 1000, 2)
+    if requested_at > received_at:
+        raise ValueError("received_at precedes requested_at")
 
     ret_code = payload.get("retCode")
     if type(ret_code) is not int:
@@ -62,6 +85,11 @@ def probe_kline(*, symbol: str, category: str, timeframe: str, limit: int,
     if not isinstance(rows, list) or not rows:
         raise ValueError("result.list must be a non-empty list")
 
+    closed_rows, latest_closed_start_ms = _validate_candles(
+        rows=rows, timeframe=timeframe, received_at=received_at
+    )
+    latest_closed_start = datetime.fromtimestamp(latest_closed_start_ms / 1000, tz=timezone.utc)
+
     return {
         "ok": True,
         "endpoint": f"{base_url.rstrip('/')}{_ENDPOINT}",
@@ -69,10 +97,12 @@ def probe_kline(*, symbol: str, category: str, timeframe: str, limit: int,
         "category": category,
         "timeframe": timeframe,
         "requested_at": requested_at.isoformat(),
-        "received_at": received_at.astimezone(timezone.utc).isoformat(),
+        "received_at": received_at.isoformat(),
         "elapsed_ms": elapsed_ms,
         "ret_code": ret_code,
         "candle_rows": len(rows),
+        "closed_candle_rows": closed_rows,
+        "latest_closed_candle_start": latest_closed_start.isoformat(),
     }
 
 

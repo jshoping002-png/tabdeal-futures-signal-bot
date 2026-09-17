@@ -25,19 +25,24 @@ class FakeTransport:
         return self.payload, self.received_at
 
 
-def test_probe_validates_public_response(monkeypatch):
-    payload = {
+def _payload(start_ms):
+    return {
         "retCode": 0,
         "result": {
             "symbol": "BTCUSDT",
             "category": "linear",
-            "list": [["1", "2", "1", "1.5", "3", "4", "5"]],
+            "list": [[str(start_ms), "2", "1", "1.5", "3", "4", "5"]],
         },
     }
+
+
+def test_probe_validates_public_response_and_closed_candle(monkeypatch):
+    received = datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc)
+    start_ms = int(datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
     monkeypatch.setattr(
         probe_module,
         "UrllibJsonTransport",
-        lambda base_url: FakeTransport(payload, datetime.now(timezone.utc)),
+        lambda base_url: FakeTransport(_payload(start_ms), received),
     )
     result = probe_module.probe_kline(
         symbol="btcusdt",
@@ -49,6 +54,8 @@ def test_probe_validates_public_response(monkeypatch):
     assert result["ok"] is True
     assert result["ret_code"] == 0
     assert result["candle_rows"] == 1
+    assert result["closed_candle_rows"] == 1
+    assert result["latest_closed_candle_start"] == "2026-01-01T00:00:00+00:00"
 
 
 def test_probe_rejects_provider_error(monkeypatch):
@@ -70,3 +77,25 @@ def test_probe_rejects_provider_error(monkeypatch):
         assert "Bybit provider error" in str(exc)
     else:
         raise AssertionError("provider error was not rejected")
+
+
+def test_probe_rejects_when_all_returned_candles_are_open(monkeypatch):
+    received = datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)
+    start_ms = int(datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    monkeypatch.setattr(
+        probe_module,
+        "UrllibJsonTransport",
+        lambda base_url: FakeTransport(_payload(start_ms), received),
+    )
+    try:
+        probe_module.probe_kline(
+            symbol="BTCUSDT",
+            category="linear",
+            timeframe="60",
+            limit=5,
+            timeout_seconds=5,
+        )
+    except ValueError as exc:
+        assert "no closed Kline candle" in str(exc)
+    else:
+        raise AssertionError("open candle was accepted")
