@@ -42,6 +42,13 @@ from .source_access import (
     get_source_access_spec,
     source_ids,
 )
+from .source_readiness import (
+    ReadinessGate,
+    SourceReadiness,
+    all_source_readiness,
+    source_readiness_counts,
+    source_readiness_for,
+)
 
 
 __all__ = [
@@ -50,6 +57,7 @@ __all__ = [
     "EndpointExactness",
     "FIXTURE_FORMAT_VERSION",
     "KNOWN_RUNTIME_SOURCE_HOSTS",
+    "ReadinessGate",
     "ReplayFixtureDataSource",
     "RUNTIME_CONFIGURED_SOURCE_IDS",
     "RuntimeEndpointConfig",
@@ -57,11 +65,13 @@ __all__ = [
     "SourceAccessSpec",
     "SourceLifecycle",
     "SourceOperationalManifest",
+    "SourceReadiness",
     "SnapshotFixtureCodec",
     "VERIFIED_ADAPTER_BINDINGS",
     "VERIFIED_ENDPOINT_CONTRACTS",
     "VERIFIED_SOURCE_ACCESS_SPECS",
     "adapter_bindings_for",
+    "all_source_readiness",
     "build_runtime_source",
     "endpoint_contracts_for",
     "explicit_runtime_endpoint_config",
@@ -73,5 +83,7 @@ __all__ = [
     "source_ids",
     "source_ids_with_adapters",
     "source_ids_with_endpoint_contracts",
+    "source_readiness_counts",
+    "source_readiness_for",
     "validate_operational_manifest",
 ]
