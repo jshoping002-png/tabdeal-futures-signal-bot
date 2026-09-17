@@ -4,7 +4,7 @@ import argparse
 import json
 import time
 from datetime import datetime, timezone
-from typing import Mapping
+from typing import Callable, Mapping
 from urllib.error import HTTPError, URLError
 
 from tabdeal_signal.data_sources.bybit import UrllibJsonTransport
@@ -38,7 +38,8 @@ def _validate_candles(*, rows: list[object], timeframe: str, received_at: dateti
 
 
 def probe_kline(*, symbol: str, category: str, timeframe: str, limit: int,
-                timeout_seconds: float, base_url: str = "https://api.bybit.com") -> dict[str, object]:
+                timeout_seconds: float, base_url: str = "https://api.bybit.com",
+                now_fn: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> dict[str, object]:
     symbol = symbol.strip().upper()
     category = category.strip().lower()
     timeframe = timeframe.strip()
@@ -53,7 +54,7 @@ def probe_kline(*, symbol: str, category: str, timeframe: str, limit: int,
     if timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be positive")
 
-    requested_at = datetime.now(timezone.utc)
+    requested_at = now_fn().astimezone(timezone.utc)
     params = {
         "category": category,
         "symbol": symbol,
