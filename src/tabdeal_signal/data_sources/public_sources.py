@@ -91,6 +91,8 @@ class UrllibPublicHttpTransport:
         parsed = urlparse(url)
         if parsed.scheme != "https" or not parsed.netloc:
             raise ValueError("public source endpoint must use HTTPS")
+        if parsed.username is not None or parsed.password is not None:
+            raise ValueError("public source endpoint must not contain URL userinfo")
         for key, _ in parse_qsl(parsed.query, keep_blank_values=True):
             if key.strip().lower() in _FORBIDDEN_AUTH_KEYS:
                 raise ValueError("public source endpoint must not contain authentication material")
@@ -186,6 +188,8 @@ class _ConfiguredPublicSource(ReadOnlyDataSource):
         parsed = urlparse(endpoint)
         if parsed.scheme != "https" or not parsed.hostname:
             raise ValueError("endpoint must be an HTTPS URL")
+        if parsed.username is not None or parsed.password is not None:
+            raise ValueError("endpoint must not contain URL userinfo")
         hostname = parsed.hostname.lower()
         allowed = tuple(host.lower().strip() for host in allowed_hosts)
         if hostname not in allowed and not any(hostname.endswith("." + host) for host in allowed):

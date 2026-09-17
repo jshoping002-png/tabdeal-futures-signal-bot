@@ -138,6 +138,28 @@ def test_transport_has_no_auth_surface_and_rejects_other_methods():
         )
 
 
+def test_transport_rejects_url_userinfo():
+    transport = UrllibPublicHttpTransport()
+    with pytest.raises(ValueError):
+        transport.request(
+            "GET",
+            "https://user:password@data.sec.gov/test",
+            query=None,
+            body=None,
+            content_type=None,
+            timeout_seconds=1,
+        )
+
+
+def test_configured_source_rejects_url_userinfo():
+    with pytest.raises(ValueError):
+        SecEdgarDataSource(
+            endpoint="https://user:password@data.sec.gov/test",
+            topic="submissions",
+            schema_version="r",
+        )
+
+
 def test_response_rejects_naive_received_at():
     with pytest.raises(ValueError):
         PublicHttpResponse(200, datetime(2026, 1, 1), b"{}")
