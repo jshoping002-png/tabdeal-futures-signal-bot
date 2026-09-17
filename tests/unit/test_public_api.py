@@ -5,6 +5,7 @@ from tabdeal_signal.data_sources.operational_manifest import (
     SOURCE_OPERATIONAL_MANIFEST,
     validate_operational_manifest,
 )
+from tabdeal_signal.data_sources.runtime_config import RUNTIME_CONFIGURED_SOURCE_IDS
 from tabdeal_signal.data_sources.source_access import VERIFIED_SOURCE_ACCESS_SPECS
 
 
@@ -53,6 +54,13 @@ def test_operational_manifest_cross_catalog_invariants():
     assert validate_operational_manifest() is None
     access_ids = {spec.source_id for spec in public_api.VERIFIED_SOURCE_ACCESS_SPECS}
     manifest_ids = {item.source_id for item in public_api.SOURCE_OPERATIONAL_MANIFEST}
+    runtime_ids = set(RUNTIME_CONFIGURED_SOURCE_IDS)
+    manifest_runtime_ids = {
+        item.source_id
+        for item in public_api.SOURCE_OPERATIONAL_MANIFEST
+        if item.runtime_configured_count > 0
+    }
     assert manifest_ids == access_ids
+    assert manifest_runtime_ids == runtime_ids
     assert all(item.reports for item in public_api.SOURCE_OPERATIONAL_MANIFEST)
     assert all(item.endpoint_contract_count > 0 for item in public_api.SOURCE_OPERATIONAL_MANIFEST)

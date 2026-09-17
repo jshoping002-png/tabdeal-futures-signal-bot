@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from .adapter_catalog import VERIFIED_ADAPTER_BINDINGS, source_ids_with_adapters
 from .endpoint_contracts import (
     EndpointExactness,
-    VERIFIED_ENDPOINT_CONTRACTS,
     endpoint_contracts_for,
     source_ids_with_endpoint_contracts,
 )
+from .runtime_config import RUNTIME_CONFIGURED_SOURCE_IDS
 from .source_access import (
     SourceLifecycle,
     SourceAccessSpec,
@@ -77,23 +77,36 @@ def operational_manifest_for(source_id: str) -> SourceOperationalManifest:
 
 
 def validate_operational_manifest() -> None:
-    """Fail closed when the source/access/adapter/endpoint catalogs drift apart."""
+    """Fail closed when the source/access/adapter/endpoint/runtime catalogs drift apart."""
     errors: list[str] = []
     access_ids = source_ids()
     manifest_ids = tuple(item.source_id for item in SOURCE_OPERATIONAL_MANIFEST)
     adapter_ids = source_ids_with_adapters()
     endpoint_ids = source_ids_with_endpoint_contracts()
+    runtime_ids = tuple(RUNTIME_CONFIGURED_SOURCE_IDS)
 
     if len(access_ids) != len(set(access_ids)):
         errors.append("source access catalog contains duplicate source IDs")
     if len(manifest_ids) != len(set(manifest_ids)):
         errors.append("operational manifest contains duplicate source IDs")
+    if len(runtime_ids) != len(set(runtime_ids)):
+        errors.append("runtime configuration contains duplicate source IDs")
     if manifest_ids != access_ids:
         errors.append("operational manifest IDs do not match source access IDs")
     if set(adapter_ids) != set(access_ids):
         errors.append("adapter catalog source IDs do not match source access IDs")
     if set(endpoint_ids) != set(access_ids):
         errors.append("endpoint catalog source IDs do not match source access IDs")
+    if not set(runtime_ids).issubset(set(access_ids)):
+        errors.append("runtime configuration contains an unknown source ID")
+
+    manifest_runtime_ids = {
+        item.source_id
+        for item in SOURCE_OPERATIONAL_MANIFEST
+        if item.runtime_configured_count > 0
+    }
+    if manifest_runtime_ids != set(runtime_ids):
+        errors.append("runtime-configured endpoint IDs do not match runtime source configuration")
 
     binding_pairs = {
         (binding.source_id, binding.class_name)
