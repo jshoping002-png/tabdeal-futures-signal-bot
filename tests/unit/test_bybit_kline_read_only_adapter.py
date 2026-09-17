@@ -1,5 +1,4 @@
 from datetime import datetime, timezone
-from decimal import Decimal
 
 import pytest
 
@@ -38,9 +37,7 @@ def request():
 
 
 def make_source(payload_value=None):
-    return BybitKlineDataSource(
-        "btcusdt", transport=FakeTransport(payload_value or payload())
-    )
+    return BybitKlineDataSource("btcusdt", transport=FakeTransport(payload_value or payload()))
 
 
 def test_valid_response_is_pit_safe_and_deterministically_ordered():
@@ -73,10 +70,15 @@ def test_duplicate_is_rejected():
         make_source(payload([ROWS[0], ROWS[0]])).snapshot(request())
 
 
+def test_response_category_must_match_adapter():
+    bad = payload()
+    bad["result"]["category"] = "spot"
+    with pytest.raises(ValueError, match="response category mismatch"):
+        make_source(bad).snapshot(request())
+
+
 def test_request_scope_must_exactly_match_adapter():
-    bad_request = SnapshotRequest(
-        symbols=("ETHUSDT",), timeframes=("60",), reference_time=REFERENCE
-    )
+    bad_request = SnapshotRequest(symbols=("ETHUSDT",), timeframes=("60",), reference_time=REFERENCE)
     with pytest.raises(ValueError, match="request scope"):
         make_source().snapshot(bad_request)
 

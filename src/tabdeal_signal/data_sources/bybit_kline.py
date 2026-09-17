@@ -103,6 +103,8 @@ class BybitKlineDataSource(MarketDataSource):
             raise ValueError("result must be an object")
         if result.get("symbol") != self.symbol:
             raise ValueError("response symbol mismatch")
+        if result.get("category") != self.category:
+            raise ValueError("response category mismatch")
         rows = result.get("list")
         if not isinstance(rows, list):
             raise ValueError("result.list must be a list")
