@@ -362,21 +362,21 @@ class EcbSdmxDataSource(OfficialPublicTextDataSource):
     """ECB public SDMX access; preserves JSON/CSV/SDMX/XML text formats."""
 
     def __init__(self, *, endpoint: str, topic: str, schema_version: str, query: Mapping[str, str] | None = None, timeout_seconds: float = 10.0, transport: PublicHttpTransport | None = None) -> None:
-        super().__init__(source_id="ecb-sdmx-public-api", source_kind=SourceKind.MACRO, endpoint=endpoint, topic=topic, schema_version=schema_version, allowed_hosts=("data-api.ecb.europa.eu",), method="GET", query=query, timeout_seconds=timeout_seconds, transport=transport)
+        super().__init__(source_id="ecb-data-portal-api", source_kind=SourceKind.MACRO, endpoint=endpoint, topic=topic, schema_version=schema_version, allowed_hosts=("data-api.ecb.europa.eu",), method="GET", query=query, timeout_seconds=timeout_seconds, transport=transport)
 
 
 class BisStatisticsDataSource(OfficialPublicTextDataSource):
     """BIS Statistics public API access with response format preserved."""
 
     def __init__(self, *, endpoint: str, topic: str, schema_version: str, query: Mapping[str, str] | None = None, timeout_seconds: float = 10.0, transport: PublicHttpTransport | None = None) -> None:
-        super().__init__(source_id="bis-statistics-public-api", source_kind=SourceKind.MACRO, endpoint=endpoint, topic=topic, schema_version=schema_version, allowed_hosts=("stats.bis.org",), method="GET", query=query, timeout_seconds=timeout_seconds, transport=transport)
+        super().__init__(source_id="bis-statistics-api", source_kind=SourceKind.MACRO, endpoint=endpoint, topic=topic, schema_version=schema_version, allowed_hosts=("stats.bis.org",), method="GET", query=query, timeout_seconds=timeout_seconds, transport=transport)
 
 
 class EurostatDataSource(OfficialPublicTextDataSource):
     """Eurostat public REST/SDMX access with response format preserved."""
 
     def __init__(self, *, endpoint: str, topic: str, schema_version: str, query: Mapping[str, str] | None = None, timeout_seconds: float = 10.0, transport: PublicHttpTransport | None = None) -> None:
-        super().__init__(source_id="eurostat-public-api", source_kind=SourceKind.MACRO, endpoint=endpoint, topic=topic, schema_version=schema_version, allowed_hosts=("ec.europa.eu",), method="GET", query=query, timeout_seconds=timeout_seconds, transport=transport)
+        super().__init__(source_id="eurostat-rest-sdmx-api", source_kind=SourceKind.MACRO, endpoint=endpoint, topic=topic, schema_version=schema_version, allowed_hosts=("ec.europa.eu",), method="GET", query=query, timeout_seconds=timeout_seconds, transport=transport)
 
 
 __all__ = [
