@@ -15,6 +15,8 @@ _ALLOWED_METHODS = {
     "public/get_order_book",
     "public/get_tradingview_chart_data",
 }
+_CHART_METHOD = "public/get_tradingview_chart_data"
+_CHART_RESOLUTIONS_MINUTES = {1, 3, 5, 10, 15, 30, 60, 120, 180, 360, 720}
 
 
 class DeribitPublicMarketDataSource(ReadOnlyDataSource):
@@ -82,14 +84,61 @@ class DeribitPublicMarketDataSource(ReadOnlyDataSource):
             return self._failure(topic, received_at, "provider_error", str(rpc_error))
         if "result" not in response:
             return self._failure(topic, received_at, "schema_error", "missing_result")
+        result = response["result"]
+        if self.method == _CHART_METHOD and as_of is not None:
+            result, error = _pit_filter_chart_result(result, self.params, as_of)
+            if error is not None:
+                return self._failure(topic, received_at, "pit_unavailable", error)
         return NormalizedSnapshot(
             DataSnapshotMetadata(SourceKind.EXCHANGE, topic, received_at, available_at=received_at, quality=DataQualityStatus.VALID, provenance=self._PROVENANCE),
-            {"method": self.method, "request_id": self.request_id, "params": dict(self.params), "result": response["result"]},
+            {"method": self.method, "request_id": self.request_id, "params": dict(self.params), "result": result},
         )
 
     def _failure(self, topic: str, received_at: datetime, error_class: str, *detail: str) -> NormalizedSnapshot:
         quality = DataQualityStatus.INVALID if error_class in {"invalid_payload", "schema_error"} else DataQualityStatus.UNAVAILABLE
         return NormalizedSnapshot(DataSnapshotMetadata(SourceKind.EXCHANGE, topic, received_at, available_at=received_at, quality=quality, provenance=self._PROVENANCE), {"method": self.method, "error_class": error_class, "error_detail": "|".join(detail)})
+
+
+def _pit_filter_chart_result(result, params: Mapping[str, object], as_of: datetime):
+    """Retain only completed minute-resolution candles strictly before ``as_of``.
+
+    Deribit's documented ``ticks`` are the candle time axis; the documented
+    resolution is in full minutes. Daily bars are deliberately fail-closed
+    because their calendar-close semantics are not specified here.
+    """
+    if not isinstance(result, Mapping):
+        return None, "chart_result_not_object"
+    if result.get("status") == "no_data":
+        return result, None
+    ticks = result.get("ticks")
+    if not isinstance(ticks, list):
+        return None, "chart_ticks_missing_or_invalid"
+    resolution = params.get("resolution")
+    try:
+        resolution_minutes = int(resolution)
+    except (TypeError, ValueError):
+        resolution_minutes = None
+    if resolution_minutes not in _CHART_RESOLUTIONS_MINUTES or str(resolution) == "1D":
+        return None, "unsupported_chart_resolution_for_pit"
+    close_cutoff_ms = int(as_of.timestamp() * 1000)
+    completed_indices = []
+    for index, tick in enumerate(ticks):
+        if type(tick) is not int or tick < 0:
+            return None, "invalid_chart_tick"
+        close_at_ms = tick + resolution_minutes * 60_000
+        if close_at_ms < close_cutoff_ms:
+            completed_indices.append(index)
+    if not completed_indices:
+        return None, "no_completed_candle_before_as_of"
+    filtered = dict(result)
+    for key in ("ticks", "open", "high", "low", "close", "volume", "cost"):
+        values = result.get(key)
+        if values is None:
+            continue
+        if not isinstance(values, list) or len(values) != len(ticks):
+            return None, f"chart_{key}_length_mismatch"
+        filtered[key] = [values[index] for index in completed_indices]
+    return filtered, None
 
 
 class _UrllibRpcTransport:
