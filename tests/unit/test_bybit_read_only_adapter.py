@@ -35,6 +35,12 @@ BASE = {
 NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 
 
+def make_source(payload=BASE):
+    return BybitOrderbookDataSource(
+        "BTCUSDT", transport=FakeTransport(payload, NOW), clock=lambda: NOW
+    )
+
+
 def test_valid_snapshot_normalizes_and_preserves_timing():
     transport = FakeTransport(BASE, NOW)
     source = BybitOrderbookDataSource("btcusdt", transport=transport, clock=lambda: NOW)
@@ -51,11 +57,9 @@ def test_valid_snapshot_normalizes_and_preserves_timing():
 
 
 def test_pit_rejects_snapshot_received_after_as_of():
-    source = BybitOrderbookDataSource(
-        "BTCUSDT", transport=FakeTransport(BASE, NOW), clock=lambda: NOW
+    result = make_source().fetch_snapshot(
+        as_of=datetime(2025, 12, 31, tzinfo=timezone.utc)
     )
-
-    result = source.fetch_snapshot(as_of=datetime(2025, 12, 31, tzinfo=timezone.utc))
 
     assert result.metadata.quality is DataQualityStatus.UNAVAILABLE
     assert result.values["error_class"] == "pit_unavailable"
@@ -64,9 +68,7 @@ def test_pit_rejects_snapshot_received_after_as_of():
 def test_rate_limit_response_is_unavailable():
     payload = {"retCode": 10006, "retMsg": "Too many visits!", "result": {}}
 
-    result = BybitOrderbookDataSource(
-        "BTCUSDT", transport=FakeTransport(payload, NOW), clock=lambda: NOW
-    ).fetch_snapshot()
+    result = make_source(payload).fetch_snapshot()
 
     assert result.metadata.quality is DataQualityStatus.UNAVAILABLE
     assert result.values["error_class"] == "rate_limited"
@@ -76,9 +78,36 @@ def test_malformed_book_is_invalid():
     payload = json.loads(json.dumps(BASE))
     payload["result"]["a"] = [["103", "1"], ["102", "2"]]
 
-    result = BybitOrderbookDataSource(
-        "BTCUSDT", transport=FakeTransport(payload, NOW), clock=lambda: NOW
-    ).fetch_snapshot()
+    result = make_source(payload).fetch_snapshot()
+
+    assert result.metadata.quality is DataQualityStatus.INVALID
+    assert result.values["error_class"] == "schema_error"
+
+
+def test_nonfinite_level_is_invalid():
+    payload = json.loads(json.dumps(BASE))
+    payload["result"]["a"] = [["NaN", "1"]]
+
+    result = make_source(payload).fetch_snapshot()
+
+    assert result.metadata.quality is DataQualityStatus.INVALID
+    assert result.values["error_class"] == "schema_error"
+
+
+def test_bool_timestamp_is_invalid():
+    payload = json.loads(json.dumps(BASE))
+    payload["result"]["ts"] = True
+
+    result = make_source(payload).fetch_snapshot()
+
+    assert result.metadata.quality is DataQualityStatus.INVALID
+    assert result.values["error_class"] == "schema_error"
+
+
+def test_bool_retcode_is_invalid():
+    payload = {"retCode": True, "retMsg": "OK", "result": {}}
+
+    result = make_source(payload).fetch_snapshot()
 
     assert result.metadata.quality is DataQualityStatus.INVALID
     assert result.values["error_class"] == "schema_error"
@@ -87,22 +116,31 @@ def test_malformed_book_is_invalid():
 def test_nonzero_provider_code_is_unavailable():
     payload = {"retCode": 10001, "retMsg": "provider failure", "result": {}}
 
-    result = BybitOrderbookDataSource(
-        "BTCUSDT", transport=FakeTransport(payload, NOW), clock=lambda: NOW
-    ).fetch_snapshot()
+    result = make_source(payload).fetch_snapshot()
 
     assert result.metadata.quality is DataQualityStatus.UNAVAILABLE
     assert result.values["error_class"] == "provider_error"
 
 
 def test_public_adapter_has_no_execution_methods():
-    source = BybitOrderbookDataSource(
-        "BTCUSDT", transport=FakeTransport(BASE, NOW), clock=lambda: NOW
-    )
+    source = make_source()
 
     assert not hasattr(source, "place_order")
     assert not hasattr(source, "cancel_order")
     assert not hasattr(source, "execute_trade")
+
+
+def test_unexpected_transport_exception_is_not_silenced():
+    class BrokenTransport:
+        def get(self, *args, **kwargs):
+            raise RuntimeError("programming fault")
+
+    source = BybitOrderbookDataSource(
+        "BTCUSDT", transport=BrokenTransport(), clock=lambda: NOW
+    )
+
+    with pytest.raises(RuntimeError, match="programming fault"):
+        source.fetch_snapshot()
 
 
 def test_constructor_rejects_bad_limits():
