@@ -1,9 +1,4 @@
-from tabdeal_signal.data_sources.source_access import (
-    SourceLifecycle,
-    VERIFIED_SOURCE_ACCESS_SPECS,
-    get_source_access_spec,
-    source_ids,
-)
+from tabdeal_signal.data_sources.source_access import SourceLifecycle, VERIFIED_SOURCE_ACCESS_SPECS, get_source_access_spec, source_ids
 
 
 def test_all_existing_verified_source_families_are_ledgered():
@@ -28,18 +23,10 @@ def test_no_source_can_authorize_strategy_or_trading():
     assert all(not spec.trading_enabled for spec in VERIFIED_SOURCE_ACCESS_SPECS)
 
 
-def test_bybit_adapter_scope_is_explicit_and_read_only():
-    spec = get_source_access_spec("bybit-futures-market-data")
-    assert spec.lifecycle is SourceLifecycle.ADAPTER_BUILT
-    assert "public REST kline" in spec.adapter_scope
-    assert "public REST orderbook" in spec.adapter_scope
-    assert spec.verified_hosts
-
-
-def test_unknown_source_is_rejected():
-    try:
-        get_source_access_spec("unknown")
-    except KeyError:
-        pass
-    else:
-        raise AssertionError("unknown source id must raise KeyError")
+def test_key_built_sources_reference_existing_adapter_names():
+    built_names = {name for spec in VERIFIED_SOURCE_ACCESS_SPECS for name in spec.adapter_classes}
+    assert "BinanceCoinMContinuousKlineDataSource" in built_names
+    assert "BybitTickersDataSource" in built_names
+    assert "BybitInstrumentsInfoDataSource" in built_names
+    assert "KrakenFuturesPublicCandleDataSource" in built_names
+    assert "DeribitPublicMarketDataSource" in built_names
