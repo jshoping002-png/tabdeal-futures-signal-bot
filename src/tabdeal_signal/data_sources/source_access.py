@@ -12,6 +12,17 @@ class SourceLifecycle(StrEnum):
     PRODUCTION_READY = "production_ready"
     ACTIVE = "active"
 
+    @property
+    def rank(self) -> int:
+        return {
+            SourceLifecycle.DOCUMENTED: 0,
+            SourceLifecycle.ACCESS_CONFIGURED: 1,
+            SourceLifecycle.ADAPTER_BUILT: 2,
+            SourceLifecycle.LIVE_VERIFIED: 3,
+            SourceLifecycle.PRODUCTION_READY: 4,
+            SourceLifecycle.ACTIVE: 5,
+        }[self]
+
 
 @dataclass(frozen=True, slots=True)
 class SourceAccessSpec:
@@ -45,10 +56,18 @@ class SourceAccessSpec:
             raise ValueError("verified_hosts must contain non-empty strings")
         if any(not isinstance(item, str) or not item.strip() for item in self.adapter_scope):
             raise ValueError("adapter_scope must contain non-empty strings")
+        if self.lifecycle.rank >= SourceLifecycle.ADAPTER_BUILT.rank and not (
+            self.adapter_classes and self.adapter_scope
+        ):
+            raise ValueError("adapter-built or later lifecycle requires adapter classes and scope")
+        if self.lifecycle.rank >= SourceLifecycle.LIVE_VERIFIED.rank and not self.verified_hosts:
+            raise ValueError("live-verified or later lifecycle requires verified hosts")
 
     @property
     def is_operationally_usable(self) -> bool:
-        return self.lifecycle is SourceLifecycle.ADAPTER_BUILT and bool(self.adapter_classes and self.adapter_scope)
+        return self.lifecycle.rank >= SourceLifecycle.ADAPTER_BUILT.rank and bool(
+            self.adapter_classes and self.adapter_scope
+        )
 
 
 VERIFIED_SOURCE_ACCESS_SPECS: tuple[SourceAccessSpec, ...] = (

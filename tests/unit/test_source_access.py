@@ -1,6 +1,9 @@
 from importlib import import_module
 
+import pytest
+
 from tabdeal_signal.data_sources.source_access import (
+    SourceAccessSpec,
     SourceLifecycle,
     VERIFIED_SOURCE_ACCESS_SPECS,
     get_source_access_spec,
@@ -80,3 +83,62 @@ def test_unresolved_runtime_endpoints_remain_explicit():
         assert spec.exact_endpoint_required is True
         assert spec.lifecycle is SourceLifecycle.ADAPTER_BUILT
         assert any("runtime-configured" in scope for scope in spec.adapter_scope)
+
+
+def make_spec(lifecycle, *, adapter_classes=("Adapter",), adapter_scope=("scope",), verified_hosts=("example.com",)):
+    return SourceAccessSpec(
+        source_id="test-source",
+        name="Test Source",
+        reports=("001",),
+        lifecycle=lifecycle,
+        adapter_classes=adapter_classes,
+        adapter_scope=adapter_scope,
+        verified_hosts=verified_hosts,
+    )
+
+
+def test_lifecycle_rank_is_monotonic():
+    ordered = tuple(SourceLifecycle)
+    assert [item.rank for item in ordered] == list(range(len(ordered)))
+
+
+@pytest.mark.parametrize("lifecycle", tuple(SourceLifecycle))
+def test_operational_usability_requires_adapter_contract(lifecycle):
+    spec = make_spec(lifecycle)
+    expected = lifecycle.rank >= SourceLifecycle.ADAPTER_BUILT.rank
+    assert spec.is_operationally_usable is expected
+
+
+def test_adapter_built_or_later_requires_adapter_classes_and_scope():
+    for lifecycle in (
+        SourceLifecycle.ADAPTER_BUILT,
+        SourceLifecycle.LIVE_VERIFIED,
+        SourceLifecycle.PRODUCTION_READY,
+        SourceLifecycle.ACTIVE,
+    ):
+        with pytest.raises(ValueError):
+            make_spec(lifecycle, adapter_classes=(), adapter_scope=("scope",))
+        with pytest.raises(ValueError):
+            make_spec(lifecycle, adapter_classes=("Adapter",), adapter_scope=())
+
+
+def test_live_verified_or_later_requires_verified_hosts():
+    for lifecycle in (
+        SourceLifecycle.LIVE_VERIFIED,
+        SourceLifecycle.PRODUCTION_READY,
+        SourceLifecycle.ACTIVE,
+    ):
+        with pytest.raises(ValueError):
+            make_spec(lifecycle, verified_hosts=())
+
+
+def test_documented_and_access_configured_can_be_metadata_only():
+    for lifecycle in (SourceLifecycle.DOCUMENTED, SourceLifecycle.ACCESS_CONFIGURED):
+        spec = make_spec(lifecycle, adapter_classes=(), adapter_scope=(), verified_hosts=())
+        assert not spec.is_operationally_usable
+
+
+def test_current_verified_source_families_remain_adapter_usable():
+    assert len(VERIFIED_SOURCE_ACCESS_SPECS) == 18
+    assert all(spec.lifecycle is SourceLifecycle.ADAPTER_BUILT for spec in VERIFIED_SOURCE_ACCESS_SPECS)
+    assert all(spec.is_operationally_usable for spec in VERIFIED_SOURCE_ACCESS_SPECS)
