@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -41,6 +41,20 @@ def _request(tmp_path, status=DecisionStatus.BLOCKED, key="k-1", event_id=None):
         idempotency_key=key,
         event_id=event_id,
     )
+
+
+def _lease_fields(record):
+    return {
+        "owner_id": record["owner_id"],
+        "lease_token": record["lease_token"],
+    }
+
+
+def _now_text(offset_seconds: int = 0) -> str:
+    return (
+        datetime.now(timezone.utc).replace(microsecond=0)
+        + timedelta(seconds=offset_seconds)
+    ).isoformat()
 
 
 def test_blocked_is_persisted_without_outbox(tmp_path):
@@ -138,10 +152,17 @@ def test_quarantine_outbox_record_dead_letters_claimed_row(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
         db.persist(_request(tmp_path, status=DecisionStatus.SIGNAL, key="quarantine-key", event_id="quarantine-event"))
-        claimed = db.claim_pending_outbox(now="2026-01-01T00:00:00+00:00", lease_seconds=60, limit=1)
+        now = _now_text()
+        claimed = db.claim_pending_outbox(
+            now=now, lease_seconds=60, limit=1, owner_id="worker-1"
+        )
         assert len(claimed) == 1
         internal_id = claimed[0]["internal_id"]
-        db.quarantine_outbox_record(internal_id, "invalid event_id: missing or non-string")
+        db.quarantine_outbox_record(
+            internal_id,
+            "invalid event_id: missing or non-string",
+            **_lease_fields(claimed[0]),
+        )
         row = db._connection.execute(
             "SELECT status, last_error, locked_until FROM outbox WHERE rowid = ?", (internal_id,)
         ).fetchone()
@@ -177,16 +198,24 @@ def test_sent_outbox_record_is_not_claimed_again(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
         db.persist(_request(tmp_path, status=DecisionStatus.SIGNAL, key="sent-key", event_id="sent-event"))
-        claimed = db.claim_pending_outbox(now="2026-01-01T00:00:00+00:00", lease_seconds=60, limit=1)
+        now = _now_text()
+        sent_at = (datetime.fromisoformat(now) + timedelta(seconds=30)).isoformat()
+        claimed = db.claim_pending_outbox(
+            now=now, lease_seconds=60, limit=1, owner_id="worker-1"
+        )
         assert len(claimed) == 1
-        db.mark_outbox_sent("sent-event", sent_at="2026-01-01T00:00:30+00:00")
-        assert db.claim_pending_outbox(now="2026-01-01T00:01:00+00:00", limit=1) == []
+        db.mark_outbox_sent(
+            "sent-event",
+            sent_at=sent_at,
+            **_lease_fields(claimed[0]),
+        )
+        assert db.claim_pending_outbox(now=sent_at, limit=1) == []
         row = db._connection.execute(
             "SELECT status, sent_at, locked_until FROM outbox WHERE event_id = ?",
             ("sent-event",),
         ).fetchone()
         assert row["status"] == "SENT"
-        assert row["sent_at"] == "2026-01-01T00:00:30+00:00"
+        assert row["sent_at"] == sent_at
         assert row["locked_until"] is None
     finally:
         db.close()
