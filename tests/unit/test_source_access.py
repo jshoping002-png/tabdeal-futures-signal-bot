@@ -1,32 +1,82 @@
-from tabdeal_signal.data_sources.source_access import SourceLifecycle, VERIFIED_SOURCE_ACCESS_SPECS, get_source_access_spec, source_ids
+from importlib import import_module
+
+from tabdeal_signal.data_sources.source_access import (
+    SourceLifecycle,
+    VERIFIED_SOURCE_ACCESS_SPECS,
+    get_source_access_spec,
+    source_ids,
+)
 
 
-def test_all_existing_verified_source_families_are_ledgered():
-    ids = source_ids()
-    assert len(ids) == 18
-    assert len(set(ids)) == len(ids)
-    assert get_source_access_spec("bybit-futures-market-data").reports == ("001", "2040")
+ADAPTER_MODULES = {
+    "BinanceCoinMContinuousKlineDataSource": "tabdeal_signal.data_sources.binance_coinm",
+    "BybitKlineDataSource": "tabdeal_signal.data_sources.bybit_kline",
+    "BybitOrderbookDataSource": "tabdeal_signal.data_sources.bybit",
+    "BybitOpenInterestDataSource": "tabdeal_signal.data_sources.bybit_open_interest",
+    "BybitFundingRateDataSource": "tabdeal_signal.data_sources.bybit_funding",
+    "BybitTickersDataSource": "tabdeal_signal.data_sources.bybit_tickers",
+    "BybitInstrumentsInfoDataSource": "tabdeal_signal.data_sources.bybit_instruments",
+    "BlsPublicApiDataSource": "tabdeal_signal.data_sources.public_sources",
+    "BinanceSpotMarketDataSource": "tabdeal_signal.data_sources.source_family_adapters",
+    "TreasuryDailyRatesDataSource": "tabdeal_signal.data_sources.public_sources",
+    "SecEdgarDataSource": "tabdeal_signal.data_sources.public_sources",
+    "OkxMarketDataSource": "tabdeal_signal.data_sources.source_family_adapters",
+    "KrakenFuturesPublicCandleDataSource": "tabdeal_signal.data_sources.kraken_futures",
+    "CoinbaseAdvancedTradeMarketDataSource": "tabdeal_signal.data_sources.source_family_adapters",
+    "DeribitPublicMarketDataSource": "tabdeal_signal.data_sources.deribit_public",
+    "CftcPublicReportingDataSource": "tabdeal_signal.data_sources.public_sources",
+    "CoinMarketCapKeylessDataSource": "tabdeal_signal.data_sources.public_sources",
+    "EcbSdmxDataSource": "tabdeal_signal.data_sources.public_sources",
+    "BisStatisticsDataSource": "tabdeal_signal.data_sources.public_sources",
+    "EurostatDataSource": "tabdeal_signal.data_sources.public_sources",
+    "OecdSdmxDataSource": "tabdeal_signal.data_sources.source_family_adapters",
+    "NyFedMarketsDataSource": "tabdeal_signal.data_sources.source_family_adapters",
+}
+
+EXPECTED_SOURCE_IDS = {
+    "binance-futures-market-data", "bybit-futures-market-data", "bls-public-api",
+    "binance-spot-market-data", "bybit-spot-market-data", "us-treasury-daily-interest-rates",
+    "sec-edgar-public-api", "okx-market-data", "kraken-futures-market-data",
+    "coinbase-advanced-trade-market-data", "deribit-market-data", "cftc-public-reporting",
+    "coinmarketcap-keyless-public-api", "ecb-data-portal-api", "bis-statistics-api",
+    "eurostat-rest-sdmx-api", "oecd-data-explorer-sdmx", "ny-fed-markets-data",
+}
 
 
-def test_only_built_adapters_claim_operational_scope():
+def test_catalog_has_exactly_the_registered_source_families():
+    assert set(source_ids()) == EXPECTED_SOURCE_IDS
+    assert len(VERIFIED_SOURCE_ACCESS_SPECS) == 18
+    assert len(set(source_ids())) == 18
+
+
+def test_every_registered_adapter_class_is_importable_and_built():
+    seen_classes = set()
     for spec in VERIFIED_SOURCE_ACCESS_SPECS:
-        if spec.lifecycle is SourceLifecycle.ADAPTER_BUILT:
-            assert spec.adapter_classes
-            assert spec.adapter_scope
-            assert spec.is_operationally_usable
-        else:
-            assert not spec.is_operationally_usable
+        assert spec.lifecycle is SourceLifecycle.ADAPTER_BUILT
+        assert spec.strategy_authorized is False
+        assert spec.trading_enabled is False
+        for class_name in spec.adapter_classes:
+            module = import_module(ADAPTER_MODULES[class_name])
+            assert getattr(module, class_name) is not None
+            seen_classes.add(class_name)
+    assert seen_classes == set(ADAPTER_MODULES)
 
 
-def test_no_source_can_authorize_strategy_or_trading():
-    assert all(not spec.strategy_authorized for spec in VERIFIED_SOURCE_ACCESS_SPECS)
-    assert all(not spec.trading_enabled for spec in VERIFIED_SOURCE_ACCESS_SPECS)
+def test_existing_report_linkage_is_preserved():
+    for report in ("001", "002", "003", "004", "005", "006", "007", "008"):
+        assert [spec for spec in VERIFIED_SOURCE_ACCESS_SPECS if report in spec.reports]
+    assert "2040" in get_source_access_spec("bybit-futures-market-data").reports
 
 
-def test_key_built_sources_reference_existing_adapter_names():
-    built_names = {name for spec in VERIFIED_SOURCE_ACCESS_SPECS for name in spec.adapter_classes}
-    assert "BinanceCoinMContinuousKlineDataSource" in built_names
-    assert "BybitTickersDataSource" in built_names
-    assert "BybitInstrumentsInfoDataSource" in built_names
-    assert "KrakenFuturesPublicCandleDataSource" in built_names
-    assert "DeribitPublicMarketDataSource" in built_names
+def test_unresolved_runtime_endpoints_remain_explicit():
+    for source_id in (
+        "binance-spot-market-data",
+        "okx-market-data",
+        "coinbase-advanced-trade-market-data",
+        "oecd-data-explorer-sdmx",
+        "ny-fed-markets-data",
+    ):
+        spec = get_source_access_spec(source_id)
+        assert spec.exact_endpoint_required is True
+        assert spec.lifecycle is SourceLifecycle.ADAPTER_BUILT
+        assert any("runtime-configured" in scope for scope in spec.adapter_scope)
