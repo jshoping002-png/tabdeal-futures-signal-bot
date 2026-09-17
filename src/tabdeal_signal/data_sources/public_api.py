@@ -24,6 +24,7 @@ from .operational_manifest import (
     SourceOperationalManifest,
     operational_manifest_counts,
     operational_manifest_for,
+    validate_operational_manifest,
 )
 from .replay import FIXTURE_FORMAT_VERSION, ReplayFixtureDataSource, SnapshotFixtureCodec
 from .runtime_config import (
@@ -72,4 +73,5 @@ __all__ = [
     "source_ids",
     "source_ids_with_adapters",
     "source_ids_with_endpoint_contracts",
+    "validate_operational_manifest",
 ]
