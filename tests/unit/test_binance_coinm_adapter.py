@@ -40,6 +40,16 @@ def test_future_closing_candle_is_pit_unavailable():
     assert snapshot.values["error_class"] == "pit_unavailable"
 
 
+def test_exact_close_boundary_is_not_treated_as_closed():
+    received = datetime(2026, 1, 1, tzinfo=UTC)
+    exact_close = int(received.timestamp() * 1000)
+    payload = [[1767225540000, "1", "1", "1", "1", "1", exact_close, "1", 1, "1", "1", "0"]]
+    source = BinanceCoinMContinuousKlineDataSource("BTCUSD", "PERPETUAL", "1m", transport=FakeTransport(payload, received))
+    snapshot = source.fetch_snapshot(as_of=received)
+    assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
+    assert snapshot.values["error_class"] == "pit_unavailable"
+
+
 def test_contract_and_span_constraints_are_enforced():
     try:
         BinanceCoinMContinuousKlineDataSource("BTCUSD", "BAD", "1m")
