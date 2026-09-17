@@ -67,6 +67,14 @@ def test_runtime_config_rejects_authentication_material_in_url():
         )
 
 
+def test_runtime_config_rejects_url_userinfo():
+    with pytest.raises(ValueError):
+        runtime_endpoint_config(
+            "sec-edgar-public-api",
+            "https://user:password@data.sec.gov/test",
+        )
+
+
 def test_runtime_config_rejects_unknown_or_wrongly_scoped_sources():
     with pytest.raises(KeyError):
         runtime_endpoint_config("not-an-existing-source", "https://example.com/test")

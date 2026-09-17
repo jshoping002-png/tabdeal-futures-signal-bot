@@ -36,6 +36,8 @@ class RuntimeEndpointConfig:
         parsed = urlparse(self.endpoint.strip())
         if parsed.scheme != "https" or not parsed.hostname:
             raise ValueError("runtime source endpoint must be HTTPS")
+        if parsed.username is not None or parsed.password is not None:
+            raise ValueError("runtime endpoint must not contain URL userinfo")
         hostname = parsed.hostname.lower()
         allowed = tuple(host.strip().lower() for host in self.allowed_hosts)
         if hostname not in allowed and not any(hostname.endswith("." + host) for host in allowed):
