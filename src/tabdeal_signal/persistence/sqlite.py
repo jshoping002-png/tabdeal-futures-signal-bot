@@ -141,14 +141,21 @@ class SQLiteDecisionPersistence:
         return PersistenceResult(persisted=True, idempotent_replay=False)
 
     def claim_pending_outbox(
-        self, now: str | None = None, lease_seconds: int = 60, limit: int = 10,
+        self,
+        now: str | None = None,
+        lease_seconds: int = 60,
+        limit: int = 10,
         owner_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible records and assign an ownership token."""
         if lease_seconds <= 0 or limit <= 0:
             raise ValueError("lease_seconds and limit must be positive")
+        if owner_id is not None and (
+            not isinstance(owner_id, str) or not owner_id.strip()
+        ):
+            raise ValueError("owner_id must be a non-empty string when provided")
         current = now or _utc_now()
-        owner = owner_id or f"worker:{uuid.uuid4()}"
+        owner = owner_id if owner_id is not None else f"worker:{uuid.uuid4()}"
         locked_until = _plus_seconds(current, lease_seconds)
         claimed: list[dict[str, Any]] = []
         with self._connection:
@@ -161,7 +168,8 @@ class SQLiteDecisionPersistence:
                     OR (status = 'PROCESSING' AND locked_until IS NOT NULL AND locked_until <= ?)
                 )
                 ORDER BY created_at, event_id LIMIT ?
-                """, (current, current, limit),
+                """,
+                (current, current, limit),
             ).fetchall()
             for row in rows:
                 token = str(uuid.uuid4())
@@ -172,7 +180,8 @@ class SQLiteDecisionPersistence:
                         locked_until = ?, updated_at = ?, last_error = NULL,
                         owner_id = ?, lease_token = ?
                     WHERE rowid = ?
-                    """, (locked_until, current, owner, token, row["internal_id"]),
+                    """,
+                    (locked_until, current, owner, token, row["internal_id"]),
                 )
                 item = self._connection.execute(
                     "SELECT rowid AS internal_id, * FROM outbox WHERE rowid = ?",
@@ -182,81 +191,134 @@ class SQLiteDecisionPersistence:
                     claimed.append(dict(item))
         return claimed
 
-    def _lease_where(self, owner_id: str | None, lease_token: str | None) -> tuple[str, tuple[Any, ...]]:
-        if owner_id is None or lease_token is None:
-            return "event_id = ? AND status = 'PROCESSING'", ()
-        return ("event_id = ? AND status = 'PROCESSING' AND owner_id = ? "
-                "AND lease_token = ? AND locked_until IS NOT NULL AND locked_until > ?", (owner_id, lease_token))
+    @staticmethod
+    def _validate_lease(owner_id: str, lease_token: str) -> None:
+        if (
+            not isinstance(owner_id, str)
+            or not owner_id.strip()
+            or not isinstance(lease_token, str)
+            or not lease_token.strip()
+        ):
+            raise ValueError("owner_id and lease_token must be non-empty strings")
 
-    def mark_outbox_sent(self, event_id: str, sent_at: str | None = None,
-                         owner_id: str | None = None, lease_token: str | None = None) -> None:
+    def mark_outbox_sent(
+        self,
+        event_id: str,
+        sent_at: str | None = None,
+        *,
+        owner_id: str,
+        lease_token: str,
+    ) -> None:
+        self._validate_lease(owner_id, lease_token)
         timestamp = sent_at or _utc_now()
-        if owner_id is None or lease_token is None:
-            where, extra = "event_id = ? AND status = 'PROCESSING'", ()
-            params = (timestamp, timestamp, event_id)
-        else:
-            where = ("event_id = ? AND status = 'PROCESSING' AND owner_id = ? AND lease_token = ? "
-                     "AND locked_until IS NOT NULL AND locked_until > ?")
-            params = (timestamp, timestamp, event_id, owner_id, lease_token, timestamp)
+        checked_at = _utc_now()
         with self._connection:
             cursor = self._connection.execute(
-                f"""UPDATE outbox SET status='SENT', sent_at=?, locked_until=NULL,
-                    next_attempt_at=NULL, last_error=NULL, updated_at=?, owner_id=NULL, lease_token=NULL
-                    WHERE {where}""", params)
+                """
+                UPDATE outbox
+                SET status='SENT', sent_at=?, locked_until=NULL,
+                    next_attempt_at=NULL, last_error=NULL, updated_at=?,
+                    owner_id=NULL, lease_token=NULL
+                WHERE event_id = ? AND status = 'PROCESSING'
+                  AND owner_id = ? AND lease_token = ?
+                  AND locked_until IS NOT NULL AND locked_until > ?
+                """,
+                (timestamp, checked_at, event_id, owner_id, lease_token, checked_at),
+            )
             if cursor.rowcount != 1:
                 raise ValueError(f"outbox event lease is invalid: {event_id}")
 
-    def mark_outbox_retry(self, event_id: str, next_attempt_at: str, error: str,
-                          owner_id: str | None = None, lease_token: str | None = None) -> None:
-        if not error.strip(): raise ValueError("error must be non-empty")
+    def mark_outbox_retry(
+        self,
+        event_id: str,
+        next_attempt_at: str,
+        error: str,
+        *,
+        owner_id: str,
+        lease_token: str,
+    ) -> None:
+        if not error.strip():
+            raise ValueError("error must be non-empty")
+        self._validate_lease(owner_id, lease_token)
         timestamp = _utc_now()
-        if owner_id is None or lease_token is None:
-            where = "event_id = ? AND status = 'PROCESSING'"
-            params = (next_attempt_at, error, timestamp, event_id)
-        else:
-            where = ("event_id = ? AND status = 'PROCESSING' AND owner_id = ? AND lease_token = ? "
-                     "AND locked_until IS NOT NULL AND locked_until > ?")
-            params = (next_attempt_at, error, timestamp, event_id, owner_id, lease_token, timestamp)
         with self._connection:
             cursor = self._connection.execute(
-                f"""UPDATE outbox SET status='RETRY', next_attempt_at=?, locked_until=NULL,
-                    last_error=?, updated_at=?, owner_id=NULL, lease_token=NULL WHERE {where}""", params)
-            if cursor.rowcount != 1: raise ValueError(f"outbox event lease is invalid: {event_id}")
+                """
+                UPDATE outbox
+                SET status='RETRY', next_attempt_at=?, locked_until=NULL,
+                    last_error=?, updated_at=?, owner_id=NULL, lease_token=NULL
+                WHERE event_id = ? AND status = 'PROCESSING'
+                  AND owner_id = ? AND lease_token = ?
+                  AND locked_until IS NOT NULL AND locked_until > ?
+                """,
+                (
+                    next_attempt_at,
+                    error,
+                    timestamp,
+                    event_id,
+                    owner_id,
+                    lease_token,
+                    timestamp,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(f"outbox event lease is invalid: {event_id}")
 
-    def mark_outbox_dead_letter(self, event_id: str, error: str,
-                                owner_id: str | None = None, lease_token: str | None = None) -> None:
-        if not error.strip(): raise ValueError("error must be non-empty")
+    def mark_outbox_dead_letter(
+        self,
+        event_id: str,
+        error: str,
+        *,
+        owner_id: str,
+        lease_token: str,
+    ) -> None:
+        if not error.strip():
+            raise ValueError("error must be non-empty")
+        self._validate_lease(owner_id, lease_token)
         timestamp = _utc_now()
-        if owner_id is None or lease_token is None:
-            where = "event_id = ? AND status = 'PROCESSING'"
-            params = (error, timestamp, event_id)
-        else:
-            where = ("event_id = ? AND status = 'PROCESSING' AND owner_id = ? AND lease_token = ? "
-                     "AND locked_until IS NOT NULL AND locked_until > ?")
-            params = (error, timestamp, event_id, owner_id, lease_token, timestamp)
         with self._connection:
             cursor = self._connection.execute(
-                f"""UPDATE outbox SET status='DEAD_LETTER', locked_until=NULL,
-                    last_error=?, updated_at=?, owner_id=NULL, lease_token=NULL WHERE {where}""", params)
-            if cursor.rowcount != 1: raise ValueError(f"outbox event lease is invalid: {event_id}")
+                """
+                UPDATE outbox
+                SET status='DEAD_LETTER', locked_until=NULL,
+                    last_error=?, updated_at=?, owner_id=NULL, lease_token=NULL
+                WHERE event_id = ? AND status = 'PROCESSING'
+                  AND owner_id = ? AND lease_token = ?
+                  AND locked_until IS NOT NULL AND locked_until > ?
+                """,
+                (error, timestamp, event_id, owner_id, lease_token, timestamp),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(f"outbox event lease is invalid: {event_id}")
 
-    def quarantine_outbox_record(self, internal_id: int, error: str,
-                                 owner_id: str | None = None, lease_token: str | None = None) -> None:
-        if not isinstance(internal_id, int) or internal_id <= 0: raise ValueError("internal_id must be positive")
-        if not error.strip(): raise ValueError("error must be non-empty")
+    def quarantine_outbox_record(
+        self,
+        internal_id: int,
+        error: str,
+        *,
+        owner_id: str,
+        lease_token: str,
+    ) -> None:
+        if not isinstance(internal_id, int) or internal_id <= 0:
+            raise ValueError("internal_id must be positive")
+        if not error.strip():
+            raise ValueError("error must be non-empty")
+        self._validate_lease(owner_id, lease_token)
         timestamp = _utc_now()
-        if owner_id is None or lease_token is None:
-            where = "rowid = ? AND status = 'PROCESSING'"
-            params = (error, timestamp, internal_id)
-        else:
-            where = ("rowid = ? AND status = 'PROCESSING' AND owner_id = ? AND lease_token = ? "
-                     "AND locked_until IS NOT NULL AND locked_until > ?")
-            params = (error, timestamp, internal_id, owner_id, lease_token, timestamp)
         with self._connection:
             cursor = self._connection.execute(
-                f"""UPDATE outbox SET status='DEAD_LETTER', locked_until=NULL,
-                    last_error=?, updated_at=?, owner_id=NULL, lease_token=NULL WHERE {where}""", params)
-            if cursor.rowcount != 1: raise ValueError(f"outbox row lease is invalid: {internal_id}")
+                """
+                UPDATE outbox
+                SET status='DEAD_LETTER', locked_until=NULL,
+                    last_error=?, updated_at=?, owner_id=NULL, lease_token=NULL
+                WHERE rowid = ? AND status = 'PROCESSING'
+                  AND owner_id = ? AND lease_token = ?
+                  AND locked_until IS NOT NULL AND locked_until > ?
+                """,
+                (error, timestamp, internal_id, owner_id, lease_token, timestamp),
+            )
+            if cursor.rowcount != 1:
+                raise ValueError(f"outbox row lease is invalid: {internal_id}")
 
     def recover_expired_processing(self, now: str | None = None) -> int:
         """Return expired leases to RETRY without creating new events."""

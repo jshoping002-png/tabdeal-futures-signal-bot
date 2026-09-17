@@ -17,17 +17,61 @@ from tabdeal_signal.notifications.transport import NotificationTransport
 class OutboxPersistence(Protocol):
     """Minimal persistence surface required by the notification worker."""
 
-    def claim_pending_outbox(self, now: str | None = None, lease_seconds: int = 60, limit: int = 10) -> list[dict[str, Any]]: ...
-    def mark_outbox_sent(self, event_id: str, sent_at: str | None = None) -> None: ...
-    def mark_outbox_retry(self, event_id: str, next_attempt_at: str, error: str) -> None: ...
-    def mark_outbox_dead_letter(self, event_id: str, error: str) -> None: ...
-    def quarantine_outbox_record(self, internal_id: int, error: str) -> None: ...
+    def claim_pending_outbox(
+        self, now: str | None = None, lease_seconds: int = 60, limit: int = 10
+    ) -> list[dict[str, Any]]: ...
+
+    def mark_outbox_sent(
+        self,
+        event_id: str,
+        sent_at: str | None = None,
+        *,
+        owner_id: str,
+        lease_token: str,
+    ) -> None: ...
+
+    def mark_outbox_retry(
+        self,
+        event_id: str,
+        next_attempt_at: str,
+        error: str,
+        *,
+        owner_id: str,
+        lease_token: str,
+    ) -> None: ...
+
+    def mark_outbox_dead_letter(
+        self,
+        event_id: str,
+        error: str,
+        *,
+        owner_id: str,
+        lease_token: str,
+    ) -> None: ...
+
+    def quarantine_outbox_record(
+        self,
+        internal_id: int,
+        error: str,
+        *,
+        owner_id: str,
+        lease_token: str,
+    ) -> None: ...
 
 
 class NotificationWorker:
     """Deliver claimed signal outbox records with bounded retry behavior."""
 
-    def __init__(self, persistence: OutboxPersistence, transport: NotificationTransport, *, max_attempts: int = 3, base_backoff_seconds: int = 30, lease_seconds: int = 60, batch_size: int = 10) -> None:
+    def __init__(
+        self,
+        persistence: OutboxPersistence,
+        transport: NotificationTransport,
+        *,
+        max_attempts: int = 3,
+        base_backoff_seconds: int = 30,
+        lease_seconds: int = 60,
+        batch_size: int = 10,
+    ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be positive")
         if base_backoff_seconds < 1:
@@ -43,12 +87,40 @@ class NotificationWorker:
 
     def run_once(self, *, now: str | None = None) -> int:
         current = now or _utc_now()
-        records = self._persistence.claim_pending_outbox(now=current, lease_seconds=self._lease_seconds, limit=self._batch_size)
+        records = self._persistence.claim_pending_outbox(
+            now=current,
+            lease_seconds=self._lease_seconds,
+            limit=self._batch_size,
+        )
         for record in records:
             self._process_record(record, current=current)
         return len(records)
 
-    def _process_record(self, record: Mapping[str, Any], *, current: str) -> None:
+    @staticmethod
+    def _lease_fields(
+        record: Mapping[str, Any],
+    ) -> tuple[str, str] | None:
+        owner_id = record.get("owner_id")
+        lease_token = record.get("lease_token")
+        if (
+            not isinstance(owner_id, str)
+            or not owner_id.strip()
+            or not isinstance(lease_token, str)
+            or not lease_token.strip()
+        ):
+            return None
+        return owner_id, lease_token
+
+    def _process_record(
+        self, record: Mapping[str, Any], *, current: str
+    ) -> None:
+        lease = self._lease_fields(record)
+        if lease is None:
+            # A claimed record without exact ownership metadata cannot be
+            # mutated safely. Leave it for lease expiry/recovery.
+            return
+
+        owner_id, lease_token = lease
         event_id = record.get("event_id")
         if not isinstance(event_id, str) or not event_id.strip():
             internal_id = record.get("internal_id")
@@ -56,7 +128,12 @@ class NotificationWorker:
                 reason = "invalid event_id: missing or non-string"
                 if isinstance(event_id, str):
                     reason = "invalid event_id: empty or whitespace-only"
-                self._persistence.quarantine_outbox_record(internal_id, reason)
+                self._persistence.quarantine_outbox_record(
+                    internal_id,
+                    reason,
+                    owner_id=owner_id,
+                    lease_token=lease_token,
+                )
             return
 
         try:
@@ -68,13 +145,29 @@ class NotificationWorker:
             error = _error_text(exc)
             attempts = int(record.get("attempt_count") or 0)
             if attempts >= self._max_attempts:
-                self._persistence.mark_outbox_dead_letter(event_id, error)
+                self._persistence.mark_outbox_dead_letter(
+                    event_id,
+                    error,
+                    owner_id=owner_id,
+                    lease_token=lease_token,
+                )
             else:
                 delay = self._base_backoff_seconds * (2 ** max(attempts - 1, 0))
-                self._persistence.mark_outbox_retry(event_id, _plus_seconds(current, delay), error)
+                self._persistence.mark_outbox_retry(
+                    event_id,
+                    _plus_seconds(current, delay),
+                    error,
+                    owner_id=owner_id,
+                    lease_token=lease_token,
+                )
             return
 
-        self._persistence.mark_outbox_sent(event_id, sent_at=current)
+        self._persistence.mark_outbox_sent(
+            event_id,
+            sent_at=current,
+            owner_id=owner_id,
+            lease_token=lease_token,
+        )
 
 
 def _utc_now() -> str:
