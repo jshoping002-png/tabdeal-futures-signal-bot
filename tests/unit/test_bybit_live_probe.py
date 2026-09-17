@@ -37,6 +37,7 @@ def _payload(start_ms):
 
 
 def test_probe_validates_public_response_and_closed_candle(monkeypatch):
+    requested = datetime(2026, 1, 1, 1, 59, tzinfo=timezone.utc)
     received = datetime(2026, 1, 1, 2, 0, tzinfo=timezone.utc)
     start_ms = int(datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
     monkeypatch.setattr(
@@ -50,6 +51,7 @@ def test_probe_validates_public_response_and_closed_candle(monkeypatch):
         timeframe="60",
         limit=5,
         timeout_seconds=5,
+        now_fn=lambda: requested,
     )
     assert result["ok"] is True
     assert result["ret_code"] == 0
@@ -59,11 +61,13 @@ def test_probe_validates_public_response_and_closed_candle(monkeypatch):
 
 
 def test_probe_rejects_provider_error(monkeypatch):
+    requested = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)
+    received = datetime(2026, 1, 1, 1, 0, 1, tzinfo=timezone.utc)
     payload = {"retCode": 10006, "retMsg": "rate limit"}
     monkeypatch.setattr(
         probe_module,
         "UrllibJsonTransport",
-        lambda base_url: FakeTransport(payload, datetime.now(timezone.utc)),
+        lambda base_url: FakeTransport(payload, received),
     )
     try:
         probe_module.probe_kline(
@@ -72,6 +76,7 @@ def test_probe_rejects_provider_error(monkeypatch):
             timeframe="60",
             limit=5,
             timeout_seconds=5,
+            now_fn=lambda: requested,
         )
     except ValueError as exc:
         assert "Bybit provider error" in str(exc)
@@ -80,6 +85,7 @@ def test_probe_rejects_provider_error(monkeypatch):
 
 
 def test_probe_rejects_when_all_returned_candles_are_open(monkeypatch):
+    requested = datetime(2026, 1, 1, 0, 29, tzinfo=timezone.utc)
     received = datetime(2026, 1, 1, 0, 30, tzinfo=timezone.utc)
     start_ms = int(datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
     monkeypatch.setattr(
@@ -94,8 +100,33 @@ def test_probe_rejects_when_all_returned_candles_are_open(monkeypatch):
             timeframe="60",
             limit=5,
             timeout_seconds=5,
+            now_fn=lambda: requested,
         )
     except ValueError as exc:
         assert "no closed Kline candle" in str(exc)
     else:
         raise AssertionError("open candle was accepted")
+
+
+def test_probe_rejects_received_at_before_requested_at(monkeypatch):
+    requested = datetime(2026, 1, 1, 1, 0, tzinfo=timezone.utc)
+    received = datetime(2026, 1, 1, 0, 59, 59, tzinfo=timezone.utc)
+    start_ms = int(datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc).timestamp() * 1000)
+    monkeypatch.setattr(
+        probe_module,
+        "UrllibJsonTransport",
+        lambda base_url: FakeTransport(_payload(start_ms), received),
+    )
+    try:
+        probe_module.probe_kline(
+            symbol="BTCUSDT",
+            category="linear",
+            timeframe="60",
+            limit=5,
+            timeout_seconds=5,
+            now_fn=lambda: requested,
+        )
+    except ValueError as exc:
+        assert "received_at precedes requested_at" in str(exc)
+    else:
+        raise AssertionError("received-before-requested was accepted")
