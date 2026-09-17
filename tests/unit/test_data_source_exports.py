@@ -1,15 +1,23 @@
 from tabdeal_signal.data_sources import (
+    BybitOrderbookDataSource,
     DataProvenance,
     DataQualityStatus,
     DataSnapshotMetadata,
+    JsonTransport,
     NormalizedSnapshot,
     ReadOnlyDataSource,
     SourceKind,
     SourceRegistration,
     SourceStatus,
     StaticDataSource,
+    UrllibJsonTransport,
 )
 from tabdeal_signal.data_sources import __all__ as data_source_exports
+from tabdeal_signal.data_sources.bybit import (
+    BybitOrderbookDataSource as module_bybit,
+    JsonTransport as module_transport,
+    UrllibJsonTransport as module_urllib,
+)
 from tabdeal_signal.data_sources.contracts import (
     DataProvenance as module_provenance,
     DataQualityStatus as module_quality,
@@ -35,6 +43,9 @@ def test_data_source_package_exports_match_contract_symbols() -> None:
     assert SourceRegistration is module_registration
     assert SourceStatus is module_status
     assert StaticDataSource is module_static
+    assert BybitOrderbookDataSource is module_bybit
+    assert JsonTransport is module_transport
+    assert UrllibJsonTransport is module_urllib
 
 
 def test_data_source_package_exports_are_explicit_and_stable() -> None:
@@ -48,4 +59,7 @@ def test_data_source_package_exports_are_explicit_and_stable() -> None:
         "SourceRegistration",
         "SourceStatus",
         "StaticDataSource",
+        "BybitOrderbookDataSource",
+        "JsonTransport",
+        "UrllibJsonTransport",
     ]

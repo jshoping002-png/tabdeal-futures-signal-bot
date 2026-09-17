@@ -10,6 +10,7 @@ from .contracts import (
 )
 from .registry import SourceRegistration, SourceStatus
 from .static import StaticDataSource
+from .bybit import BybitOrderbookDataSource, JsonTransport, UrllibJsonTransport
 
 __all__ = [
     "DataProvenance",
@@ -21,4 +22,7 @@ __all__ = [
     "SourceRegistration",
     "SourceStatus",
     "StaticDataSource",
+    "BybitOrderbookDataSource",
+    "JsonTransport",
+    "UrllibJsonTransport",
 ]
