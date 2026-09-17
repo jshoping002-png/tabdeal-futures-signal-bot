@@ -23,7 +23,7 @@ or provider-contract work.
 | Source | Verification record(s) | Lifecycle | Bounded adapter scope |
 |---|---|---|---|
 | Binance Futures Market Data | 001 | DOCUMENTED | Continuous-contract kline documentation only; exact project endpoint contract pending |
-| Bybit Futures Market Data | 001, 2040 | ADAPTER_BUILT | Public REST kline; public REST orderbook |
+| Bybit Futures Market Data | 001, 2040 | ADAPTER_BUILT | Public REST kline; public REST orderbook; public REST open interest; public REST funding rate history |
 | BLS Public Data API | 001 | ADAPTER_BUILT | Public JSON envelope; exact series/PIT contract runtime-configured |
 | Binance Spot Market Data | 002 | DOCUMENTED | Public market-data boundary |
 | Bybit Spot Market Data | 002 | ADAPTER_BUILT | Public REST kline with `category=spot` |
@@ -40,6 +40,13 @@ or provider-contract work.
 | Eurostat REST / SDMX APIs | 006 | ADAPTER_BUILT | Public REST/SDMX text envelope |
 | OECD Data Explorer SDMX API | 007 | DOCUMENTED | Public SDMX endpoint family; exact dataset/series contract pending |
 | NY Fed Markets Data APIs | 008 | DOCUMENTED | Public markets-data API family; route-by-route auth contract pending |
+
+## Latest completion within the 001–2040 scope
+
+The existing report set through 2040 documents Bybit Open Interest and Funding Rate History.
+The operationalization layer now has bounded adapters for both public REST endpoints. The
+adapters preserve provider strings, timestamps, pagination cursor where supplied, provenance,
+and point-in-time rejection semantics. They do not infer units, strategy meaning, or execution behavior.
 
 ## Acceptance boundary
 

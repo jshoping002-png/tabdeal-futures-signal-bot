@@ -11,8 +11,6 @@ from enum import StrEnum
 
 
 class SourceLifecycle(StrEnum):
-    """Operational lifecycle without implying production activation."""
-
     DOCUMENTED = "documented"
     ACCESS_CONFIGURED = "access_configured"
     ADAPTER_BUILT = "adapter_built"
@@ -23,8 +21,6 @@ class SourceLifecycle(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class SourceAccessSpec:
-    """Source-family operationalization metadata derived from existing reports."""
-
     source_id: str
     name: str
     reports: tuple[str, ...]
@@ -60,193 +56,44 @@ class SourceAccessSpec:
 
     @property
     def is_operationally_usable(self) -> bool:
-        """True only for a built adapter with an explicitly bounded scope."""
-
         return self.lifecycle is SourceLifecycle.ADAPTER_BUILT and bool(
             self.adapter_classes and self.adapter_scope
         )
 
 
 VERIFIED_SOURCE_ACCESS_SPECS: tuple[SourceAccessSpec, ...] = (
-    SourceAccessSpec(
-        source_id="binance-futures-market-data",
-        name="Binance Futures Market Data",
-        reports=("001",),
-        lifecycle=SourceLifecycle.DOCUMENTED,
-        verified_hosts=("developers.binance.com",),
-        adapter_scope=("continuous-contract klines documented; exact project endpoint contract pending",),
-    ),
-    SourceAccessSpec(
-        source_id="bybit-futures-market-data",
-        name="Bybit Futures Market Data",
-        reports=("001", "2040"),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("BybitKlineDataSource", "BybitOrderbookDataSource"),
-        verified_hosts=("api.bybit.com", "bybit-exchange.github.io"),
-        adapter_scope=("public REST kline", "public REST orderbook"),
-    ),
-    SourceAccessSpec(
-        source_id="bls-public-api",
-        name="U.S. Bureau of Labor Statistics Public Data API",
-        reports=("001",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("BlsPublicApiDataSource",),
-        verified_hosts=("api.bls.gov", "bls.gov"),
-        adapter_scope=("public JSON envelope; exact series/PIT contract remains runtime-configured",),
-    ),
-    SourceAccessSpec(
-        source_id="binance-spot-market-data",
-        name="Binance Spot Market Data",
-        reports=("002",),
-        lifecycle=SourceLifecycle.DOCUMENTED,
-        verified_hosts=("data-api.binance.vision", "developers.binance.com"),
-        adapter_scope=("public market-data boundary",),
-    ),
-    SourceAccessSpec(
-        source_id="bybit-spot-market-data",
-        name="Bybit Spot Market Data",
-        reports=("002",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("BybitKlineDataSource",),
-        verified_hosts=("api.bybit.com",),
-        adapter_scope=("public REST kline with category=spot",),
-    ),
-    SourceAccessSpec(
-        source_id="us-treasury-daily-interest-rates",
-        name="U.S. Treasury Daily Interest-Rate Data",
-        reports=("002",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("TreasuryDailyRatesDataSource",),
-        verified_hosts=("home.treasury.gov",),
-        adapter_scope=("official XML feed envelope",),
-    ),
-    SourceAccessSpec(
-        source_id="sec-edgar-public-api",
-        name="SEC EDGAR Public APIs",
-        reports=("002",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("SecEdgarDataSource",),
-        verified_hosts=("data.sec.gov",),
-        adapter_scope=("public JSON submissions/XBRL envelope",),
-    ),
-    SourceAccessSpec(
-        source_id="okx-market-data",
-        name="OKX Market Data",
-        reports=("003",),
-        lifecycle=SourceLifecycle.DOCUMENTED,
-        verified_hosts=("okx.com",),
-        adapter_scope=("public market-data endpoint family; exact project endpoint contract pending",),
-    ),
-    SourceAccessSpec(
-        source_id="kraken-futures-market-data",
-        name="Kraken Futures Market Data",
-        reports=("003",),
-        lifecycle=SourceLifecycle.DOCUMENTED,
-        verified_hosts=("docs.kraken.com",),
-        adapter_scope=("public futures candles/analytics documented",),
-    ),
-    SourceAccessSpec(
-        source_id="coinbase-advanced-trade-market-data",
-        name="Coinbase Advanced Trade Market Data",
-        reports=("003",),
-        lifecycle=SourceLifecycle.DOCUMENTED,
-        verified_hosts=("docs.cdp.coinbase.com",),
-        adapter_scope=("public Advanced Trade market-data boundary; derivatives not assumed",),
-    ),
-    SourceAccessSpec(
-        source_id="deribit-market-data",
-        name="Deribit Market Data",
-        reports=("003",),
-        lifecycle=SourceLifecycle.DOCUMENTED,
-        verified_hosts=("docs.deribit.com",),
-        adapter_scope=("public market-data boundary",),
-    ),
-    SourceAccessSpec(
-        source_id="cftc-public-reporting",
-        name="CFTC Commitments of Traders / Public Reporting",
-        reports=("004",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("CftcPublicReportingDataSource",),
-        verified_hosts=("publicreporting.cftc.gov", "cftc.gov"),
-        adapter_scope=("published feed/text envelope",),
-    ),
-    SourceAccessSpec(
-        source_id="coinmarketcap-keyless-public-api",
-        name="CoinMarketCap Keyless Public API",
-        reports=("004",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("CoinMarketCapKeylessDataSource",),
-        verified_hosts=("pro-api.coinmarketcap.com",),
-        adapter_scope=("curated public JSON envelope; rate-limited",),
-    ),
-    SourceAccessSpec(
-        source_id="ecb-data-portal-api",
-        name="European Central Bank Data Portal API",
-        reports=("005",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("EcbSdmxDataSource",),
-        verified_hosts=("data-api.ecb.europa.eu", "ecb.europa.eu"),
-        adapter_scope=("public SDMX/text envelope",),
-    ),
-    SourceAccessSpec(
-        source_id="bis-statistics-api",
-        name="Bank for International Settlements Statistics API",
-        reports=("006",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("BisStatisticsDataSource",),
-        verified_hosts=("stats.bis.org",),
-        adapter_scope=("public SDMX/text envelope",),
-    ),
-    SourceAccessSpec(
-        source_id="eurostat-rest-sdmx-api",
-        name="Eurostat REST / SDMX APIs",
-        reports=("006",),
-        lifecycle=SourceLifecycle.ADAPTER_BUILT,
-        adapter_classes=("EurostatDataSource",),
-        verified_hosts=("ec.europa.eu",),
-        adapter_scope=("public REST/SDMX text envelope",),
-    ),
-    SourceAccessSpec(
-        source_id="oecd-data-explorer-sdmx",
-        name="OECD Data Explorer SDMX API",
-        reports=("007",),
-        lifecycle=SourceLifecycle.DOCUMENTED,
-        verified_hosts=("sdmx.oecd.org", "oecd.org"),
-        adapter_scope=("public SDMX endpoint family; exact dataset/series contract pending",),
-    ),
-    SourceAccessSpec(
-        source_id="ny-fed-markets-data",
-        name="Federal Reserve Bank of New York Markets Data APIs",
-        reports=("008",),
-        lifecycle=SourceLifecycle.DOCUMENTED,
-        verified_hosts=("markets.newyorkfed.org", "newyorkfed.org"),
-        adapter_scope=("public markets-data API family; route-by-route auth contract pending",),
-    ),
+    SourceAccessSpec("binance-futures-market-data", "Binance Futures Market Data", ("001",), SourceLifecycle.DOCUMENTED, verified_hosts=("developers.binance.com",), adapter_scope=("continuous-contract klines documented; exact project endpoint contract pending",)),
+    SourceAccessSpec("bybit-futures-market-data", "Bybit Futures Market Data", ("001", "2040"), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("BybitKlineDataSource", "BybitOrderbookDataSource", "BybitOpenInterestDataSource", "BybitFundingRateDataSource"), verified_hosts=("api.bybit.com", "bybit-exchange.github.io"), adapter_scope=("public REST kline", "public REST orderbook", "public REST open interest", "public REST funding rate history")),
+    SourceAccessSpec("bls-public-api", "U.S. Bureau of Labor Statistics Public Data API", ("001",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("BlsPublicApiDataSource",), verified_hosts=("api.bls.gov", "bls.gov"), adapter_scope=("public JSON envelope; exact series/PIT contract remains runtime-configured",)),
+    SourceAccessSpec("binance-spot-market-data", "Binance Spot Market Data", ("002",), SourceLifecycle.DOCUMENTED, verified_hosts=("data-api.binance.vision", "developers.binance.com"), adapter_scope=("public market-data boundary",)),
+    SourceAccessSpec("bybit-spot-market-data", "Bybit Spot Market Data", ("002",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("BybitKlineDataSource",), verified_hosts=("api.bybit.com",), adapter_scope=("public REST kline with category=spot",)),
+    SourceAccessSpec("us-treasury-daily-interest-rates", "U.S. Treasury Daily Interest-Rate Data", ("002",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("TreasuryDailyRatesDataSource",), verified_hosts=("home.treasury.gov",), adapter_scope=("official XML feed envelope",)),
+    SourceAccessSpec("sec-edgar-public-api", "SEC EDGAR Public APIs", ("002",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("SecEdgarDataSource",), verified_hosts=("data.sec.gov",), adapter_scope=("public JSON submissions/XBRL envelope",)),
+    SourceAccessSpec("okx-market-data", "OKX Market Data", ("003",), SourceLifecycle.DOCUMENTED, verified_hosts=("okx.com",), adapter_scope=("public market-data endpoint family; exact project endpoint contract pending",)),
+    SourceAccessSpec("kraken-futures-market-data", "Kraken Futures Market Data", ("003",), SourceLifecycle.DOCUMENTED, verified_hosts=("docs.kraken.com",), adapter_scope=("public futures candles/analytics documented",)),
+    SourceAccessSpec("coinbase-advanced-trade-market-data", "Coinbase Advanced Trade Market Data", ("003",), SourceLifecycle.DOCUMENTED, verified_hosts=("docs.cdp.coinbase.com",), adapter_scope=("public Advanced Trade market-data boundary; derivatives not assumed",)),
+    SourceAccessSpec("deribit-market-data", "Deribit Market Data", ("003",), SourceLifecycle.DOCUMENTED, verified_hosts=("docs.deribit.com",), adapter_scope=("public market-data boundary",)),
+    SourceAccessSpec("cftc-public-reporting", "CFTC Commitments of Traders / Public Reporting", ("004",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("CftcPublicReportingDataSource",), verified_hosts=("publicreporting.cftc.gov", "cftc.gov"), adapter_scope=("published feed/text envelope",)),
+    SourceAccessSpec("coinmarketcap-keyless-public-api", "CoinMarketCap Keyless Public API", ("004",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("CoinMarketCapKeylessDataSource",), verified_hosts=("pro-api.coinmarketcap.com",), adapter_scope=("curated public JSON envelope; rate-limited",)),
+    SourceAccessSpec("ecb-data-portal-api", "European Central Bank Data Portal API", ("005",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("EcbSdmxDataSource",), verified_hosts=("data-api.ecb.europa.eu", "ecb.europa.eu"), adapter_scope=("public SDMX/text envelope",)),
+    SourceAccessSpec("bis-statistics-api", "Bank for International Settlements Statistics API", ("006",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("BisStatisticsDataSource",), verified_hosts=("stats.bis.org",), adapter_scope=("public SDMX/text envelope",)),
+    SourceAccessSpec("eurostat-rest-sdmx-api", "Eurostat REST / SDMX APIs", ("006",), SourceLifecycle.ADAPTER_BUILT, adapter_classes=("EurostatDataSource",), verified_hosts=("ec.europa.eu",), adapter_scope=("public REST/SDMX text envelope",)),
+    SourceAccessSpec("oecd-data-explorer-sdmx", "OECD Data Explorer SDMX API", ("007",), SourceLifecycle.DOCUMENTED, verified_hosts=("sdmx.oecd.org", "oecd.org"), adapter_scope=("public SDMX endpoint family; exact dataset/series contract pending",)),
+    SourceAccessSpec("ny-fed-markets-data", "Federal Reserve Bank of New York Markets Data APIs", ("008",), SourceLifecycle.DOCUMENTED, verified_hosts=("markets.newyorkfed.org", "newyorkfed.org"), adapter_scope=("public markets-data API family; route-by-route auth contract pending",)),
 )
 
 
 def get_source_access_spec(source_id: str) -> SourceAccessSpec:
-    """Return one source spec by stable identifier."""
-
     if not isinstance(source_id, str) or not source_id.strip():
         raise ValueError("source_id must be a non-empty string")
-    normalized = source_id.strip()
     for spec in VERIFIED_SOURCE_ACCESS_SPECS:
-        if spec.source_id == normalized:
+        if spec.source_id == source_id.strip():
             return spec
-    raise KeyError(normalized)
+    raise KeyError(source_id.strip())
 
 
 def source_ids() -> tuple[str, ...]:
-    """Return stable ids in deterministic order."""
-
     return tuple(spec.source_id for spec in VERIFIED_SOURCE_ACCESS_SPECS)
 
 
-__all__ = [
-    "SourceAccessSpec",
-    "SourceLifecycle",
-    "VERIFIED_SOURCE_ACCESS_SPECS",
-    "get_source_access_spec",
-    "source_ids",
-]
+__all__ = ["SourceAccessSpec", "SourceLifecycle", "VERIFIED_SOURCE_ACCESS_SPECS", "get_source_access_spec", "source_ids"]
