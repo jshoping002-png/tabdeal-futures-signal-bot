@@ -1,4 +1,4 @@
-from tabdeal_signal.data_sources import (
+from tabdeal_signal.data_sources.source_access import (
     SourceLifecycle,
     VERIFIED_SOURCE_ACCESS_SPECS,
     get_source_access_spec,
