@@ -149,8 +149,8 @@ class BinanceCoinMContinuousKlineDataSource(ReadOnlyDataSource):
         if open_time_ms < 0 or close_time_ms < open_time_ms:
             raise ValueError("invalid kline timestamps")
         close_at = datetime.fromtimestamp(close_time_ms / 1000, timezone.utc)
-        if as_of is not None and close_at > as_of:
-            raise _PITUnavailable("candle close is after as_of")
+        if as_of is not None and close_at >= as_of:
+            raise _PITUnavailable("candle close is not strictly before as_of")
         # Preserve all provider-defined cells; only timestamps are interpreted for PIT/closed checks.
         return tuple(row)
 
