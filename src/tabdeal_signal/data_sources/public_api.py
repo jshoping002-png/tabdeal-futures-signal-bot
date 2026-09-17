@@ -39,6 +39,11 @@ from .runtime_config import (
     explicit_runtime_endpoint_config,
     runtime_endpoint_config,
 )
+from .runtime_config_validation import (
+    RuntimeConfigValidationResult,
+    runtime_configuration_counts,
+    validate_runtime_configuration_catalog,
+)
 from .runtime_source_factory import build_runtime_source
 from .source_access import (
     SourceAccessSpec,
@@ -72,6 +77,7 @@ __all__ = [
     "ReadinessGate",
     "ReplayFixtureDataSource",
     "RUNTIME_CONFIGURED_SOURCE_IDS",
+    "RuntimeConfigValidationResult",
     "RuntimeEndpointConfig",
     "SOURCE_OPERATIONAL_MANIFEST",
     "SourceAccessSpec",
@@ -92,6 +98,7 @@ __all__ = [
     "operational_manifest_counts",
     "operational_manifest_for",
     "resolve_adapter_class",
+    "runtime_configuration_counts",
     "runtime_endpoint_config",
     "source_adapter_validation_counts",
     "source_ids",
@@ -101,5 +108,6 @@ __all__ = [
     "source_readiness_for",
     "validate_endpoint_catalog",
     "validate_operational_manifest",
+    "validate_runtime_configuration_catalog",
     "validate_source_adapter_catalog",
 ]
