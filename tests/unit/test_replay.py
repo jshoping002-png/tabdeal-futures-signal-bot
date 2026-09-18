@@ -76,3 +76,29 @@ def test_replay_requires_available_at_and_strict_time_order():
 def test_codec_rejects_unsupported_fixture_version():
     with pytest.raises(ValueError, match="unsupported fixture format version"):
         SnapshotFixtureCodec.decode(b'{"format_version":"999"}')
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("source", None),
+        ("reference", None),
+        ("schema_version", None),
+        ("source", 123),
+        ("reference", 123),
+        ("schema_version", 123),
+        ("source", ""),
+        ("reference", " "),
+        ("schema_version", ""),
+    ],
+)
+def test_codec_rejects_invalid_provenance_fields(field, value):
+    raw = SnapshotFixtureCodec.encode(snapshot(available_at=datetime(2026, 1, 1, tzinfo=UTC), value=1))
+    import json
+
+    payload = json.loads(raw)
+    payload["metadata"]["provenance"][field] = value
+    tampered = json.dumps(payload).encode("utf-8")
+
+    with pytest.raises(ValueError, match="invalid fixture provenance"):
+        SnapshotFixtureCodec.decode(tampered)

@@ -107,11 +107,12 @@ class SnapshotFixtureCodec:
             if not isinstance(provenance_data, Mapping):
                 raise ValueError("fixture provenance must be an object or null")
             try:
-                provenance = DataProvenance(
-                    str(provenance_data["source"]),
-                    str(provenance_data["reference"]),
-                    str(provenance_data["schema_version"]),
-                )
+                source = provenance_data["source"]
+                reference = provenance_data["reference"]
+                schema_version = provenance_data["schema_version"]
+                if not all(isinstance(value, str) and value.strip() for value in (source, reference, schema_version)):
+                    raise ValueError("fixture provenance fields must be non-empty strings")
+                provenance = DataProvenance(source, reference, schema_version)
             except (KeyError, ValueError) as exc:
                 raise ValueError("invalid fixture provenance") from exc
         values = payload.get("values")
