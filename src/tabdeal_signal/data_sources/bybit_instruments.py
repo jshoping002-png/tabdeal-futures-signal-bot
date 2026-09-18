@@ -115,7 +115,12 @@ class BybitInstrumentsInfoDataSource(ReadOnlyDataSource):
         if type(payload.get("retCode")) is not int:
             return self._failure(topic, received_at, "schema_error", "missing_or_non_integer_retCode")
         if payload["retCode"] != 0:
-            return self._failure(topic, received_at, "provider_error", str(payload["retCode"]))
+            return self._failure(
+                topic,
+                received_at,
+                "rate_limited" if payload["retCode"] == 10006 else "provider_error",
+                str(payload["retCode"]),
+            )
         try:
             values = self._normalize(payload.get("result"))
         except ValueError as exc:

@@ -72,6 +72,23 @@ def test_spot_instruments_info_rejects_cursor_or_limit():
         raise AssertionError("spot limit must be rejected")
 
 
+def test_tickers_and_instruments_classify_provider_rate_limits():
+    received = datetime(2026, 1, 1, tzinfo=UTC)
+    transport = FakeTransport({"retCode": 10006, "result": {}}, received)
+
+    tickers = BybitTickersDataSource(
+        category="linear", symbol="BTCUSDT", transport=transport
+    ).fetch_snapshot()
+    instruments = BybitInstrumentsInfoDataSource(
+        category="linear", transport=transport
+    ).fetch_snapshot()
+
+    for snapshot in (tickers, instruments):
+        assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
+        assert snapshot.values["error_class"] == "rate_limited"
+        assert snapshot.values["error_detail"] == "10006"
+
+
 def test_catalog_adapters_are_read_only():
     assert not hasattr(BybitTickersDataSource, "place_order")
     assert not hasattr(BybitInstrumentsInfoDataSource, "place_order")
