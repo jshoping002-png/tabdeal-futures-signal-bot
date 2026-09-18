@@ -126,7 +126,12 @@ class BybitOpenInterestDataSource(ReadOnlyDataSource):
                 topic, received_at, "schema_error", "missing_or_non_integer_retCode"
             )
         if ret_code != 0:
-            return self._failure(topic, received_at, "provider_error", str(ret_code))
+            return self._failure(
+                topic,
+                received_at,
+                "rate_limited" if ret_code == 10006 else "provider_error",
+                str(ret_code),
+            )
         if as_of is not None and received_at > as_of:
             return self._failure(topic, received_at, "pit_unavailable", "received_after_as_of")
 

@@ -82,6 +82,23 @@ def test_open_interest_classifies_http_rate_limits_without_raising():
     assert snapshot.values["error_detail"] == "429"
 
 
+def test_open_interest_and_funding_classify_provider_rate_limits():
+    received = datetime(2026, 1, 1, tzinfo=UTC)
+    transport = FakeTransport({"retCode": 10006, "result": {}}, received)
+
+    open_interest = BybitOpenInterestDataSource(
+        "BTCUSDT", transport=transport
+    ).fetch_snapshot()
+    funding = BybitFundingRateDataSource(
+        "BTCUSDT", transport=transport
+    ).fetch_snapshot()
+
+    for snapshot in (open_interest, funding):
+        assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
+        assert snapshot.values["error_class"] == "rate_limited"
+        assert snapshot.values["error_detail"] == "10006"
+
+
 def test_funding_history_normalizes_rate_and_timestamp():
     received = datetime(2026, 1, 1, tzinfo=UTC)
     transport = FakeTransport(
