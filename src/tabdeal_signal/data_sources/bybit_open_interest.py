@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
+from urllib.error import HTTPError, URLError
 
 from .bybit import JsonTransport, UrllibJsonTransport
 from .contracts import (
@@ -103,7 +104,14 @@ class BybitOpenInterestDataSource(ReadOnlyDataSource):
             if received_at.tzinfo is None or received_at.utcoffset() is None:
                 raise ValueError("transport received_at must be timezone-aware")
             received_at = received_at.astimezone(timezone.utc)
-        except (TimeoutError, OSError) as exc:
+        except HTTPError as exc:
+            return self._failure(
+                topic,
+                datetime.now(timezone.utc),
+                "rate_limited" if exc.code in (403, 429) else "http_error",
+                str(exc.code),
+            )
+        except (TimeoutError, URLError, OSError) as exc:
             return self._failure(
                 topic, datetime.now(timezone.utc), "transport_error", type(exc).__name__
             )
