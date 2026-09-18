@@ -12,13 +12,28 @@ class FakeTransport:
         return self.payload, self.received_at
 
 def test_public_candle_path_and_resolution():
-    received = datetime(2026,1,1,tzinfo=UTC)
+    received = datetime(2026,1,1,0,0,0,tzinfo=UTC)
     payload = {"candles": [[1767225600000, "100", "101", "99", "100.5", "10"]], "more_candles": False}
     t = FakeTransport(payload, received)
     s = KrakenFuturesPublicCandleDataSource("trade", "PI_XBTUSD", "1m", transport=t)
     snap = s.fetch_snapshot(as_of=received)
-    assert snap.metadata.quality is DataQualityStatus.VALID
+    assert snap.metadata.quality is DataQualityStatus.UNAVAILABLE
+    assert snap.values["error_class"] == "pit_unavailable"
     assert t.calls[0][0].endswith("/api/charts/v1/trade/PI_XBTUSD/1m")
+
+def test_closed_candle_is_accepted():
+    received = datetime(2026,1,1,0,2,0,tzinfo=UTC)
+    opened = int(datetime(2026,1,1,0,0,0,tzinfo=UTC).timestamp()*1000)
+    payload = {"candles": [[opened,"100","101","99","100.5","10"]]}
+    snap = KrakenFuturesPublicCandleDataSource("trade","PI_XBTUSD","1m",transport=FakeTransport(payload,received)).fetch_snapshot(as_of=received)
+    assert snap.metadata.quality is DataQualityStatus.VALID
+
+def test_exact_close_boundary_is_not_closed():
+    received = datetime(2026,1,1,0,1,0,tzinfo=UTC)
+    opened = int(datetime(2026,1,1,0,0,0,tzinfo=UTC).timestamp()*1000)
+    payload = {"candles": [[opened,"100","101","99","100.5","10"]]}
+    snap = KrakenFuturesPublicCandleDataSource("trade","PI_XBTUSD","1m",transport=FakeTransport(payload,received)).fetch_snapshot(as_of=received)
+    assert snap.metadata.quality is DataQualityStatus.UNAVAILABLE
 
 def test_invalid_resolution_is_rejected():
     try:

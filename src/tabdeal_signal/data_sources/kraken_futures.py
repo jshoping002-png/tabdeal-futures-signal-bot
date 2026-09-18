@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -10,7 +10,7 @@ from json import loads
 
 from .contracts import DataProvenance, DataQualityStatus, DataSnapshotMetadata, NormalizedSnapshot, ReadOnlyDataSource, SourceKind
 
-_RESOLUTIONS = {"1m", "5m", "15m", "30m", "1h", "4h", "12h", "1d", "1w"}
+_RESOLUTIONS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "12h": 720, "1d": 1440, "1w": 10080}
 _TICK_TYPES = {"spot", "mark", "trade"}
 
 
@@ -23,19 +23,8 @@ class KrakenFuturesPublicCandleDataSource(ReadOnlyDataSource):
         schema_version="kraken-futures-report-003",
     )
 
-    def __init__(
-        self,
-        tick_type: str,
-        symbol: str,
-        resolution: str,
-        *,
-        timeout_seconds: float = 5.0,
-        transport=None,
-        base_url: str = "https://futures.kraken.com",
-    ) -> None:
-        tick_type = tick_type.strip().lower()
-        symbol = symbol.strip()
-        resolution = resolution.strip()
+    def __init__(self, tick_type: str, symbol: str, resolution: str, *, timeout_seconds: float = 5.0, transport=None, base_url: str = "https://futures.kraken.com") -> None:
+        tick_type, symbol, resolution = tick_type.strip().lower(), symbol.strip(), resolution.strip()
         if tick_type not in _TICK_TYPES:
             raise ValueError("unsupported Kraken Futures tick type")
         if not symbol:
@@ -77,6 +66,8 @@ class KrakenFuturesPublicCandleDataSource(ReadOnlyDataSource):
             candles = payload.get("data")
         if not isinstance(candles, list):
             return self._failure(topic, received_at, "schema_error", "missing_candles_list")
+        if not candles:
+            return self._failure(topic, received_at, "pit_unavailable", "no_candles")
         try:
             normalized = tuple(self._normalize_row(row, as_of) for row in candles)
         except _PITUnavailable as exc:
@@ -91,19 +82,20 @@ class KrakenFuturesPublicCandleDataSource(ReadOnlyDataSource):
     def _normalize_row(self, row: object, as_of: datetime | None) -> object:
         if isinstance(row, Mapping):
             timestamp = row.get("time", row.get("timestamp"))
-            if timestamp is None:
-                raise ValueError("candle row missing timestamp")
-            timestamp_ms = int(str(timestamp)) if int(str(timestamp)) > 100000000000 else int(str(timestamp)) * 1000
-            observed_at = datetime.fromtimestamp(timestamp_ms / 1000, timezone.utc)
-        elif isinstance(row, (list, tuple)):
-            if not row:
-                raise ValueError("empty candle row")
-            timestamp_ms = int(str(row[0]))
-            observed_at = datetime.fromtimestamp(timestamp_ms / 1000, timezone.utc)
+        elif isinstance(row, (list, tuple)) and row:
+            timestamp = row[0]
         else:
             raise ValueError("unsupported candle row")
-        if as_of is not None and observed_at > as_of:
-            raise _PITUnavailable("candle timestamp is after as_of")
+        try:
+            numeric_timestamp = int(str(timestamp))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("candle timestamp must be integer-like") from exc
+        timestamp_ms = numeric_timestamp if numeric_timestamp >= 100_000_000_000 else numeric_timestamp * 1000
+        opened_at = datetime.fromtimestamp(timestamp_ms / 1000, timezone.utc)
+        if as_of is not None:
+            closed_at = opened_at + timedelta(minutes=_RESOLUTIONS[self.resolution])
+            if closed_at >= as_of:
+                raise _PITUnavailable("candle close is not strictly before as_of")
         return row
 
     def _failure(self, topic: str, received_at: datetime, error_class: str, *detail: str) -> NormalizedSnapshot:
