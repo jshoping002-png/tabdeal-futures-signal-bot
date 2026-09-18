@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from urllib.error import HTTPError
 
 from tabdeal_signal.data_sources.bybit_funding import BybitFundingRateDataSource
 from tabdeal_signal.data_sources.bybit_open_interest import BybitOpenInterestDataSource
@@ -59,6 +60,26 @@ def test_open_interest_rejects_future_observation_for_pit():
     snapshot = BybitOpenInterestDataSource("BTCUSDT", transport=transport).fetch_snapshot(as_of=received)
     assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
     assert snapshot.values["error_class"] == "pit_unavailable"
+
+
+def test_open_interest_classifies_http_rate_limits_without_raising():
+    class RateLimitedTransport:
+        def get(self, *args, **kwargs):
+            raise HTTPError(
+                "https://api.bybit.com/v5/market/open-interest",
+                429,
+                "Too Many Requests",
+                {},
+                None,
+            )
+
+    snapshot = BybitOpenInterestDataSource(
+        "BTCUSDT", transport=RateLimitedTransport()
+    ).fetch_snapshot()
+
+    assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
+    assert snapshot.values["error_class"] == "rate_limited"
+    assert snapshot.values["error_detail"] == "429"
 
 
 def test_funding_history_normalizes_rate_and_timestamp():
