@@ -5,13 +5,20 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from json import loads
 
 from .contracts import DataProvenance, DataQualityStatus, DataSnapshotMetadata, NormalizedSnapshot, ReadOnlyDataSource, SourceKind
 
 _RESOLUTIONS = {"1m": 1, "5m": 5, "15m": 15, "30m": 30, "1h": 60, "4h": 240, "12h": 720, "1d": 1440, "1w": 10080}
 _TICK_TYPES = {"spot", "mark", "trade"}
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject redirects so the configured Kraken host remains authoritative."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class KrakenFuturesPublicCandleDataSource(ReadOnlyDataSource):
@@ -106,7 +113,7 @@ class KrakenFuturesPublicCandleDataSource(ReadOnlyDataSource):
 class _UrllibJsonTransport:
     def get(self, url, params, timeout_seconds):
         request = Request(url, headers={"Accept": "application/json"}, method="GET")
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with build_opener(_NoRedirectHandler()).open(request, timeout=timeout_seconds) as response:
             return loads(response.read().decode("utf-8")), datetime.now(timezone.utc)
 
 

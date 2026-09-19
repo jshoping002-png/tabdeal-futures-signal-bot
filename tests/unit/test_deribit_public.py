@@ -106,3 +106,9 @@ def test_non_chart_methods_keep_raw_result_behavior():
     snapshot = source.fetch_snapshot(as_of=received)
     assert snapshot.metadata.quality is DataQualityStatus.VALID
     assert snapshot.values["result"] == {"last_price": 123}
+
+
+def test_deribit_redirect_handler_rejects_redirects():
+    from tabdeal_signal.data_sources.deribit_public import _NoRedirectHandler
+
+    assert _NoRedirectHandler().redirect_request(None, None, 302, "Found", {}, "https://attacker.example/") is None
