@@ -110,8 +110,6 @@ class BybitInstrumentsInfoDataSource(ReadOnlyDataSource):
             return self._failure(topic, datetime.now(timezone.utc), "transport_error", type(exc).__name__)
         except ValueError as exc:
             return self._failure(topic, datetime.now(timezone.utc), "invalid_payload", str(exc))
-        if as_of is not None and received_at > as_of:
-            return self._failure(topic, received_at, "pit_unavailable", "received_after_as_of")
         if type(payload.get("retCode")) is not int:
             return self._failure(topic, received_at, "schema_error", "missing_or_non_integer_retCode")
         if payload["retCode"] != 0:
@@ -121,6 +119,8 @@ class BybitInstrumentsInfoDataSource(ReadOnlyDataSource):
                 "rate_limited" if payload["retCode"] == 10006 else "provider_error",
                 str(payload["retCode"]),
             )
+        if as_of is not None and received_at > as_of:
+            return self._failure(topic, received_at, "pit_unavailable", "received_after_as_of")
         try:
             values = self._normalize(payload.get("result"))
         except ValueError as exc:

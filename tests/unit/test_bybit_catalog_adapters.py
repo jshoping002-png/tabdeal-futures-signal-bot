@@ -106,3 +106,17 @@ def test_tickers_preserve_provider_error_when_received_after_as_of():
     assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
     assert snapshot.values["error_class"] == "provider_error"
     assert snapshot.values["error_detail"] == "10001"
+
+
+def test_instruments_preserve_provider_error_when_received_after_as_of():
+    received = datetime(2026, 1, 1, 0, 0, 1, tzinfo=UTC)
+    as_of = datetime(2026, 1, 1, tzinfo=UTC)
+    transport = FakeTransport({"retCode": 10001, "result": {}}, received)
+
+    snapshot = BybitInstrumentsInfoDataSource(
+        category="linear", transport=transport
+    ).fetch_snapshot(as_of=as_of)
+
+    assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
+    assert snapshot.values["error_class"] == "provider_error"
+    assert snapshot.values["error_detail"] == "10001"
