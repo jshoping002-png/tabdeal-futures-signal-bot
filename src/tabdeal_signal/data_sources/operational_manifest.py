@@ -32,11 +32,11 @@ class SourceOperationalManifest:
 
     @property
     def live_verified(self) -> bool:
-        return self.lifecycle is SourceLifecycle.LIVE_VERIFIED
+        return self.lifecycle.rank >= SourceLifecycle.LIVE_VERIFIED.rank
 
     @property
     def production_ready(self) -> bool:
-        return self.lifecycle is SourceLifecycle.PRODUCTION_READY
+        return self.lifecycle.rank >= SourceLifecycle.PRODUCTION_READY.rank
 
     @property
     def active(self) -> bool:
