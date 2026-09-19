@@ -92,3 +92,17 @@ def test_tickers_and_instruments_classify_provider_rate_limits():
 def test_catalog_adapters_are_read_only():
     assert not hasattr(BybitTickersDataSource, "place_order")
     assert not hasattr(BybitInstrumentsInfoDataSource, "place_order")
+
+
+def test_tickers_preserve_provider_error_when_received_after_as_of():
+    received = datetime(2026, 1, 1, 0, 0, 1, tzinfo=UTC)
+    as_of = datetime(2026, 1, 1, tzinfo=UTC)
+    transport = FakeTransport({"retCode": 10001, "result": {}}, received)
+
+    snapshot = BybitTickersDataSource(
+        category="linear", symbol="BTCUSDT", transport=transport
+    ).fetch_snapshot(as_of=as_of)
+
+    assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
+    assert snapshot.values["error_class"] == "provider_error"
+    assert snapshot.values["error_detail"] == "10001"
