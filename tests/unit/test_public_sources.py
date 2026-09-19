@@ -140,6 +140,13 @@ def test_hosts_are_strictly_scoped():
         )
 
 
+def test_transport_redirect_handler_rejects_redirects():
+    from tabdeal_signal.data_sources.public_sources import _NoRedirectHandler
+
+    handler = _NoRedirectHandler()
+    assert handler.redirect_request(None, None, 302, "Found", {}, "https://attacker.example/") is None
+
+
 def test_transport_has_no_auth_surface_and_rejects_other_methods():
     transport = UrllibPublicHttpTransport()
     with pytest.raises(ValueError):
