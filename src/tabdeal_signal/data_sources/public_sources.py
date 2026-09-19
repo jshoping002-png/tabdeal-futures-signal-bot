@@ -15,7 +15,7 @@ from json import JSONDecodeError, dumps, loads
 from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qsl, urlencode, urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 import xml.etree.ElementTree as ET
 
 from .contracts import (
@@ -61,6 +61,13 @@ class PublicHttpTransport(Protocol):
         timeout_seconds: float,
     ) -> PublicHttpResponse:
         ...
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject redirects so the initial host allowlist remains authoritative."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class UrllibPublicHttpTransport:
@@ -111,7 +118,7 @@ class UrllibPublicHttpTransport:
             headers["Content-Type"] = content_type or "application/json"
         request = Request(final_url, data=body, headers=headers, method=method)
         try:
-            with urlopen(request, timeout=timeout_seconds) as response:
+            with build_opener(_NoRedirectHandler()).open(request, timeout=timeout_seconds) as response:
                 received_at = datetime.now(timezone.utc)
                 response_body = response.read()
                 response_type = response.headers.get("Content-Type", "")
