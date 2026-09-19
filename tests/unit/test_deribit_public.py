@@ -35,6 +35,24 @@ def _payload(*ticks):
     }
 
 
+def test_provider_error_is_preserved_when_response_is_after_as_of():
+    received = datetime(2026, 1, 1, 0, 0, 2, tzinfo=UTC)
+    payload = {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {"code": 10001, "message": "provider failure"},
+    }
+    source = DeribitPublicMarketDataSource(
+        "public/ticker",
+        params={"instrument_name": "BTC-PERPETUAL"},
+        transport=FakeTransport(payload, received),
+    )
+    snapshot = source.fetch_snapshot(as_of=datetime(2026, 1, 1, 0, 0, 1, tzinfo=UTC))
+    assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
+    assert snapshot.values["error_class"] == "provider_error"
+    assert "provider failure" in snapshot.values["error_detail"]
+
+
 def test_chart_filters_only_completed_candles_strictly_before_as_of():
     received = datetime(2026, 1, 1, 0, 31, tzinfo=UTC)
     first = int(datetime(2026, 1, 1, 0, 0, tzinfo=UTC).timestamp() * 1000)

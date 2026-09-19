@@ -75,13 +75,15 @@ class DeribitPublicMarketDataSource(ReadOnlyDataSource):
             return self._failure(topic, datetime.now(timezone.utc), "transport_error", type(exc).__name__)
         except ValueError as exc:
             return self._failure(topic, datetime.now(timezone.utc), "invalid_payload", str(exc))
-        if as_of is not None and received_at > as_of:
-            return self._failure(topic, received_at, "pit_unavailable", "received_after_as_of")
         if not isinstance(response, Mapping):
             return self._failure(topic, received_at, "schema_error", "expected_json_object")
+        # Preserve documented provider errors before PIT gating so an
+        # historical as_of cannot mask a provider-side failure.
         rpc_error = response.get("error")
         if rpc_error is not None:
             return self._failure(topic, received_at, "provider_error", str(rpc_error))
+        if as_of is not None and received_at > as_of:
+            return self._failure(topic, received_at, "pit_unavailable", "received_after_as_of")
         if "result" not in response:
             return self._failure(topic, received_at, "schema_error", "missing_result")
         result = response["result"]
