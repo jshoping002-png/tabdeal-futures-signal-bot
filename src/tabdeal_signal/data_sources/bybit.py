@@ -9,7 +9,7 @@ import json
 from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .contracts import (
     DataProvenance,
@@ -41,6 +41,13 @@ class JsonTransport(Protocol):
         ...
 
 
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject redirects so the configured Bybit host remains authoritative."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 class UrllibJsonTransport:
     """Minimal standard-library HTTP transport with no credential support."""
 
@@ -55,7 +62,7 @@ class UrllibJsonTransport:
     ) -> tuple[Mapping[str, object], datetime]:
         url = f"{self._base_url}{path}?{urlencode(params)}"
         request = Request(url, headers={"Accept": "application/json"}, method="GET")
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with build_opener(_NoRedirectHandler()).open(request, timeout=timeout_seconds) as response:
             received_at = datetime.now(timezone.utc)
             body = response.read()
         parsed = json.loads(body.decode("utf-8"))

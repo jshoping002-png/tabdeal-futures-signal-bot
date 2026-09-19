@@ -151,3 +151,9 @@ def test_funding_history_enforces_documented_limit_and_category():
 def test_both_adapters_are_read_only():
     assert not hasattr(BybitOpenInterestDataSource, "place_order")
     assert not hasattr(BybitFundingRateDataSource, "place_order")
+
+
+def test_bybit_redirect_handler_rejects_redirects():
+    from tabdeal_signal.data_sources.bybit import _NoRedirectHandler
+
+    assert _NoRedirectHandler().redirect_request(None, None, 302, "Found", {}, "https://attacker.example/") is None
