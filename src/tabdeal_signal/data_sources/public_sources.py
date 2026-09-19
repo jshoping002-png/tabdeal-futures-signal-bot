@@ -239,12 +239,15 @@ class _ConfiguredPublicSource(ReadOnlyDataSource):
         if not isinstance(response, PublicHttpResponse):
             return self._failure(self._now(), "transport_error", "invalid_response_type")
         received_at = response.received_at
-        if as_of is not None and received_at > as_of:
-            return self._failure(received_at, "pit_unavailable", "received_after_as_of")
+        # HTTP failures describe provider/transport state, not usable data.
+        # Classify them before PIT checks so a historical as_of cannot hide
+        # the documented rate-limit or HTTP error class.
         if response.status_code == 429:
             return self._failure(received_at, "rate_limited", "http_429")
         if response.status_code < 200 or response.status_code >= 300:
             return self._failure(received_at, "http_error", str(response.status_code))
+        if as_of is not None and received_at > as_of:
+            return self._failure(received_at, "pit_unavailable", "received_after_as_of")
         return self._decode(response, received_at)
 
     def _decode(self, response: PublicHttpResponse, received_at: datetime) -> NormalizedSnapshot:

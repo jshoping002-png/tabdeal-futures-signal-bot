@@ -76,6 +76,21 @@ def test_http_429_is_rate_limited():
     assert snapshot.values["error_class"] == "rate_limited"
 
 
+def test_http_429_classification_is_preserved_even_when_response_is_after_as_of():
+    received = datetime(2026, 1, 1, 0, 0, 2, tzinfo=UTC)
+    transport = FakeTransport(response("{}", 429, when=received))
+    source = CoinMarketCapKeylessDataSource(
+        endpoint="https://pro-api.coinmarketcap.com/public-api/test",
+        topic="market",
+        schema_version="verification-batch-004",
+        transport=transport,
+    )
+    snapshot = source.fetch_snapshot(as_of=received - timedelta(seconds=1))
+    assert snapshot.metadata.quality is DataQualityStatus.UNAVAILABLE
+    assert snapshot.values["error_class"] == "rate_limited"
+    assert snapshot.values["error_detail"] == "http_429"
+
+
 def test_invalid_json_is_invalid():
     transport = FakeTransport(response("not-json"))
     source = SecEdgarDataSource(
