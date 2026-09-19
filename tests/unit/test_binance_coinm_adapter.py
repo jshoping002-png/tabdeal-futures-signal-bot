@@ -69,3 +69,9 @@ def test_contract_and_span_constraints_are_enforced():
 
 def test_adapter_is_read_only():
     assert not hasattr(BinanceCoinMContinuousKlineDataSource, "place_order")
+
+
+def test_default_transport_rejects_redirects():
+    from tabdeal_signal.data_sources.binance_coinm import _NoRedirectHandler
+
+    assert _NoRedirectHandler().redirect_request(None, None, 302, "Found", {}, "https://attacker.example/") is None

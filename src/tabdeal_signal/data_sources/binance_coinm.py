@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
+from urllib.request import HTTPRedirectHandler
 
 from .contracts import (
     DataProvenance,
@@ -25,6 +26,13 @@ _CONTRACT_TYPES = {"PERPETUAL", "CURRENT_MONTH", "NEXT_MONTH", "CURRENT_QUARTER"
 # Report 001 documents a maximum limit of 1500 for this endpoint.
 _LIMIT_MAX = 1500
 _MAX_SPAN_DAYS = 200
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject redirects so the configured Binance host remains authoritative."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class BinanceCoinMContinuousKlineDataSource(ReadOnlyDataSource):
@@ -165,11 +173,11 @@ class BinanceCoinMContinuousKlineDataSource(ReadOnlyDataSource):
 class _UrllibJsonTransport:
     def get(self, url: str, params: dict[str, str], timeout_seconds: float):
         from urllib.parse import urlencode
-        from urllib.request import Request, urlopen
+        from urllib.request import Request, build_opener
         from json import loads
 
         request = Request(f"{url}?{urlencode(params)}", headers={"Accept": "application/json"}, method="GET")
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with build_opener(_NoRedirectHandler()).open(request, timeout=timeout_seconds) as response:
             return loads(response.read().decode("utf-8")), datetime.now(timezone.utc)
 
 
