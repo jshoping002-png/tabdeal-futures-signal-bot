@@ -118,3 +118,14 @@ def test_unexpected_transport_error_is_not_silenced():
 
     with pytest.raises(RuntimeError, match="programming fault"):
         BybitKlineDataSource("BTCUSDT", transport=BrokenTransport()).snapshot(request())
+
+
+def test_provider_error_is_preserved_when_response_is_received_after_reference_time():
+    transport = FakeTransport(
+        {"retCode": 10006, "retMsg": "Too many visits", "result": {}},
+        received_at=REFERENCE.replace(hour=2, minute=0, second=1),
+    )
+    source = BybitKlineDataSource("BTCUSDT", transport=transport)
+
+    with pytest.raises(ValueError, match="Bybit provider error: 10006"):
+        source.snapshot(request())

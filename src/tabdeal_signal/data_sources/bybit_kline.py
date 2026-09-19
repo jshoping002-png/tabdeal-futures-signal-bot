@@ -89,14 +89,14 @@ class BybitKlineDataSource(MarketDataSource):
         if received_at.tzinfo is None or received_at.utcoffset() is None:
             raise ValueError("transport received_at must be timezone-aware")
         received_at = received_at.astimezone(timezone.utc)
-        if received_at > reference_time:
-            raise ValueError("provider response was received after reference_time")
-
         ret_code = payload.get("retCode")
         if type(ret_code) is not int:
             raise ValueError("retCode must be an integer")
         if ret_code != 0:
             raise ValueError(f"Bybit provider error: {ret_code}")
+
+        if received_at > reference_time:
+            raise ValueError("provider response was received after reference_time")
 
         result = payload.get("result")
         if not isinstance(result, Mapping):
