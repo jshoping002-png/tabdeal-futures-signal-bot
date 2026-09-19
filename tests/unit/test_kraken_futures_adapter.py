@@ -53,3 +53,9 @@ def test_future_timestamp_fails_closed():
 
 def test_read_only():
     assert not hasattr(KrakenFuturesPublicCandleDataSource, "place_order")
+
+
+def test_kraken_redirect_handler_rejects_redirects():
+    from tabdeal_signal.data_sources.kraken_futures import _NoRedirectHandler
+
+    assert _NoRedirectHandler().redirect_request(None, None, 302, "Found", {}, "https://attacker.example/") is None

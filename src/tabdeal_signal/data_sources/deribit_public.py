@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from json import dumps, loads
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .contracts import DataProvenance, DataQualityStatus, DataSnapshotMetadata, NormalizedSnapshot, ReadOnlyDataSource, SourceKind
 
@@ -17,6 +17,13 @@ _ALLOWED_METHODS = {
 }
 _CHART_METHOD = "public/get_tradingview_chart_data"
 _CHART_RESOLUTIONS_MINUTES = {1, 3, 5, 10, 15, 30, 60, 120, 180, 360, 720}
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Reject redirects so the configured Deribit host remains authoritative."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
 
 
 class DeribitPublicMarketDataSource(ReadOnlyDataSource):
@@ -147,7 +154,7 @@ class _UrllibRpcTransport:
     def post(self, url, method, params, request_id, timeout_seconds):
         body = dumps({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}, separators=(",", ":"), sort_keys=True).encode("utf-8")
         request = Request(url, data=body, headers={"Accept": "application/json", "Content-Type": "application/json"}, method="POST")
-        with urlopen(request, timeout=timeout_seconds) as response:
+        with build_opener(_NoRedirectHandler()).open(request, timeout=timeout_seconds) as response:
             return loads(response.read().decode("utf-8")), datetime.now(timezone.utc)
 
 
