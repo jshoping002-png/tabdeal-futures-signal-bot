@@ -538,3 +538,70 @@ def test_schema_validation_rejects_orphan_outbox_record(tmp_path):
     db.close()
     with pytest.raises(RuntimeError, match="orphan outbox"):
         SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+def test_schema_validation_rejects_non_object_decision_payload(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('scalar-decision-payload', 'BLOCKED', 'null', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="non-object decision payload"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_non_object_outbox_payload(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('scalar-outbox-payload', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, created_at, updated_at) "
+        "VALUES ('scalar-outbox-event', 'scalar-outbox-payload', '[]', "
+        "'2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="non-object outbox payload"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_sent_without_sent_at(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db.persist(_signal_request("sent-state", "sent-state-event"))
+    db._connection.execute(
+        "UPDATE outbox SET status = 'SENT', sent_at = NULL WHERE event_id = ?",
+        ("sent-state-event",),
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid sent_at state"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_unsent_row_with_sent_at(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db.persist(_signal_request("unsent-state", "unsent-state-event"))
+    db._connection.execute(
+        "UPDATE outbox SET sent_at = '2026-01-01T00:00:00+00:00' WHERE event_id = ?",
+        ("unsent-state-event",),
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid sent_at state"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_dead_letter_without_error(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db.persist(_signal_request("dead-letter-state", "dead-letter-state-event"))
+    db._connection.execute(
+        "UPDATE outbox SET status = 'DEAD_LETTER', last_error = NULL WHERE event_id = ?",
+        ("dead-letter-state-event",),
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid dead-letter state"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
