@@ -167,7 +167,7 @@ class SQLiteDecisionPersistence:
             not isinstance(owner_id, str) or not owner_id.strip()
         ):
             raise ValueError("owner_id must be a non-empty string when provided")
-        current = now or _utc_now()
+        current = _utc_timestamp(now)
         owner = owner_id if owner_id is not None else f"worker:{uuid.uuid4()}"
         locked_until = _plus_seconds(current, lease_seconds)
         claimed: list[dict[str, Any]] = []
@@ -193,9 +193,16 @@ class SQLiteDecisionPersistence:
                         locked_until = ?, updated_at = ?, last_error = NULL,
                         owner_id = ?, lease_token = ?
                     WHERE rowid = ?
+                      AND (
+                          status = 'PENDING'
+                          OR (status = 'RETRY' AND (next_attempt_at IS NULL OR next_attempt_at <= ?))
+                          OR (status = 'PROCESSING' AND locked_until IS NOT NULL AND locked_until <= ?)
+                      )
                     """,
-                    (locked_until, current, owner, token, row["internal_id"]),
+                    (locked_until, current, owner, token, row["internal_id"], current, current),
                 )
+                if self._connection.execute("SELECT changes()").fetchone()[0] != 1:
+                    continue
                 item = self._connection.execute(
                     "SELECT rowid AS internal_id, * FROM outbox WHERE rowid = ?",
                     (row["internal_id"],),
@@ -223,7 +230,7 @@ class SQLiteDecisionPersistence:
         lease_token: str,
     ) -> None:
         self._validate_lease(owner_id, lease_token)
-        timestamp = sent_at or _utc_now()
+        timestamp = _utc_timestamp(sent_at)
         checked_at = _utc_now()
         with self._connection:
             cursor = self._connection.execute(
@@ -250,10 +257,11 @@ class SQLiteDecisionPersistence:
         owner_id: str,
         lease_token: str,
     ) -> None:
-        if not error.strip():
-            raise ValueError("error must be non-empty")
+        if not isinstance(error, str) or not error.strip():
+            raise ValueError("error must be a non-empty string")
         self._validate_lease(owner_id, lease_token)
         timestamp = _utc_now()
+        retry_at = _utc_timestamp(next_attempt_at)
         with self._connection:
             cursor = self._connection.execute(
                 """
@@ -265,7 +273,7 @@ class SQLiteDecisionPersistence:
                   AND locked_until IS NOT NULL AND locked_until > ?
                 """,
                 (
-                    next_attempt_at,
+                    retry_at,
                     error,
                     timestamp,
                     event_id,
@@ -335,7 +343,7 @@ class SQLiteDecisionPersistence:
 
     def recover_expired_processing(self, now: str | None = None) -> int:
         """Return expired leases to RETRY without creating new events."""
-        current = now or _utc_now()
+        current = _utc_timestamp(now)
         with self._connection:
             cursor = self._connection.execute(
                 """
@@ -355,9 +363,22 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _utc_timestamp(value: str | None) -> str:
+    timestamp = _utc_now() if value is None else value
+    if not isinstance(timestamp, str) or not timestamp.strip():
+        raise ValueError("timestamp must be a non-empty ISO-8601 string")
+    try:
+        parsed = datetime.fromisoformat(timestamp)
+    except ValueError as exc:
+        raise ValueError("timestamp must be a valid ISO-8601 string") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return parsed.astimezone(timezone.utc).isoformat()
+
+
 def _plus_seconds(timestamp: str, seconds: int) -> str:
     value = datetime.fromisoformat(timestamp)
-    return (value + timedelta(seconds=seconds)).isoformat()
+    return (value + timedelta(seconds=seconds)).astimezone(timezone.utc).isoformat()
 
 
 def _event_id(request: PersistenceRequest) -> str:
