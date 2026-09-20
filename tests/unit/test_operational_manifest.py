@@ -1,8 +1,8 @@
 import pytest
 
-from tabdeal_signal.data_sources.endpoint_contracts import EndpointExactness
 from tabdeal_signal.data_sources.operational_manifest import (
     SOURCE_OPERATIONAL_MANIFEST,
+    SourceOperationalManifest,
     operational_manifest_counts,
     operational_manifest_for,
 )
@@ -40,6 +40,23 @@ def test_manifest_reports_endpoint_contract_counts_per_source():
     assert bybit.exact_endpoint_count == 6
     assert bybit.base_path_count == 0
     assert bybit.runtime_configured_count == 0
+
+
+def test_lifecycle_readiness_flags_are_monotonic():
+    manifest = SourceOperationalManifest(
+        source_id="synthetic",
+        reports=("001",),
+        lifecycle=SourceLifecycle.ACTIVE,
+        adapter_classes=("SyntheticAdapter",),
+        endpoint_contract_count=1,
+        exact_endpoint_count=1,
+        base_path_count=0,
+        runtime_configured_count=0,
+        runtime_endpoint_required=False,
+    )
+    assert manifest.live_verified
+    assert manifest.production_ready
+    assert manifest.active
 
 
 def test_manifest_lookup_rejects_unknown_source():
