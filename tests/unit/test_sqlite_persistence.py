@@ -81,6 +81,66 @@ def test_replay_is_idempotent(tmp_path):
         db.close()
 
 
+class _InterleavingConnection:
+    """Proxy that injects a concurrent commit after the preflight read."""
+
+    def __init__(self, connection, interleave):
+        self._connection = connection
+        self._interleave = interleave
+        self._triggered = False
+
+    def execute(self, sql, parameters=()):
+        cursor = self._connection.execute(sql, parameters)
+        if (
+            not self._triggered
+            and sql.startswith("SELECT payload_json FROM decisions")
+        ):
+            self._triggered = True
+            self._interleave()
+        return cursor
+
+    def __enter__(self):
+        self._connection.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return self._connection.__exit__(exc_type, exc, tb)
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
+def test_concurrent_identical_request_is_idempotent(tmp_path):
+    path = tmp_path / "signals.db"
+    first = SQLiteDecisionPersistence(path)
+    second = SQLiteDecisionPersistence(path)
+    request = _request(tmp_path, key="concurrent-key")
+    try:
+        second.persist(request)
+        first._connection.execute(
+            "DELETE FROM decisions WHERE idempotency_key = ?", ("concurrent-key",)
+        )
+        first._connection.commit()
+
+        second.close()
+        second = SQLiteDecisionPersistence(path)
+        first._connection = _InterleavingConnection(
+            first._connection, lambda: second.persist(request)
+        )
+
+        result = first.persist(request)
+
+        assert result.persisted is True
+        assert result.idempotent_replay is True
+        assert first._connection.execute(
+            "SELECT COUNT(*) FROM decisions WHERE idempotency_key = ?",
+            ("concurrent-key",),
+        ).fetchone()[0] == 1
+    finally:
+        first.close()
+        second.close()
+
+
 def test_collision_is_rejected(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
