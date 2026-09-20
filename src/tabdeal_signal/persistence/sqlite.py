@@ -152,14 +152,32 @@ class SQLiteDecisionPersistence:
             # a different payload is a collision. Other integrity failures
             # (for example an event_id collision) remain explicit failures.
             concurrent = self._connection.execute(
-                "SELECT payload_json FROM decisions WHERE idempotency_key = ?", (key,)
+                "SELECT payload_json, decision_status FROM decisions WHERE idempotency_key = ?",
+                (key,),
             ).fetchone()
             if concurrent is not None:
-                if concurrent["payload_json"] == payload:
-                    return PersistenceResult(persisted=True, idempotent_replay=True)
-                raise PersistenceCollisionError(
-                    f"idempotency key collision: {key}"
-                ) from exc
+                if concurrent["payload_json"] != payload:
+                    raise PersistenceCollisionError(
+                        f"idempotency key collision: {key}"
+                    ) from exc
+                if status == "SIGNAL":
+                    event_id = _event_id(request)
+                    outbox = self._connection.execute(
+                        "SELECT event_id, payload_json FROM outbox WHERE idempotency_key = ?",
+                        (key,),
+                    ).fetchone()
+                    if outbox is None:
+                        raise PersistenceCollisionError(
+                            f"signal persistence is incomplete: missing outbox for {key}"
+                        ) from exc
+                    if (
+                        outbox["event_id"] != event_id
+                        or outbox["payload_json"] != payload
+                    ):
+                        raise PersistenceCollisionError(
+                            f"signal persistence is inconsistent: {key}"
+                        ) from exc
+                return PersistenceResult(persisted=True, idempotent_replay=True)
             raise PersistenceCollisionError(str(exc)) from exc
 
         return PersistenceResult(persisted=True, idempotent_replay=False)
