@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
+import sqlite3
 
 from tabdeal_signal.decision.final import FinalDecision
 from tabdeal_signal.domain.contracts import (
@@ -283,8 +284,6 @@ def test_sent_outbox_record_is_not_claimed_again(tmp_path):
 
 def test_schema_validation_rejects_missing_required_decision_column(tmp_path) -> None:
     path = tmp_path / "legacy.db"
-    import sqlite3
-
     connection = sqlite3.connect(path)
     connection.execute(
         "CREATE TABLE decisions (idempotency_key TEXT PRIMARY KEY, decision_status TEXT NOT NULL, payload_json TEXT NOT NULL)"
@@ -363,3 +362,110 @@ def test_schema_validation_rejects_half_populated_lease_owner(tmp_path) -> None:
 
     with pytest.raises(RuntimeError, match="incomplete outbox lease"):
         SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_replay_rejects_decision_status_column_mismatch(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        request = _request(tmp_path, key="status-mismatch")
+        db.persist(request)
+        db._connection.execute(
+            "UPDATE decisions SET decision_status = 'SIGNAL' WHERE idempotency_key = ?",
+            ("status-mismatch",),
+        )
+        db._connection.commit()
+        with pytest.raises(PersistenceCollisionError, match="decision persistence is inconsistent"):
+            db.persist(request)
+    finally:
+        db.close()
+
+
+def test_replay_rejects_orphan_outbox_for_blocked_decision(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        request = _request(tmp_path, key="blocked-orphan")
+        db.persist(request)
+        db._connection.execute(
+            "INSERT INTO outbox (event_id, idempotency_key, payload_json, created_at, updated_at) "
+            "VALUES ('orphan-event', 'blocked-orphan', '{}', ?, ?)",
+            ("2026-01-01T00:00:00+00:00", "2026-01-01T00:00:00+00:00"),
+        )
+        db._connection.commit()
+        with pytest.raises(PersistenceCollisionError, match="non-signal persistence is inconsistent"):
+            db.persist(request)
+    finally:
+        db.close()
+
+
+def test_schema_validation_rejects_processing_row_without_lock(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('lease-missing', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, created_at, updated_at, owner_id, lease_token) "
+        "VALUES ('lease-missing-event', 'lease-missing', '{}', 'PROCESSING', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', 'worker-1', 'token-1')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="incomplete outbox lease"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_lease_fields_outside_processing(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('stale-lease', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, created_at, updated_at, owner_id, lease_token) "
+        "VALUES ('stale-lease-event', 'stale-lease', '{}', 'PENDING', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', 'worker-1', 'token-1')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="lease fields outside PROCESSING"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_naive_persisted_timestamp(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('naive-time', 'BLOCKED', '{}', '2026-01-01T00:00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="timezone-naive"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_missing_decision_primary_key(tmp_path):
+    path = tmp_path / "no-primary-key.db"
+    connection = sqlite3.connect(path)
+    connection.execute(
+        "CREATE TABLE decisions (idempotency_key TEXT NOT NULL, decision_status TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "CREATE TABLE outbox (event_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE, payload_json TEXT NOT NULL, status TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT, locked_until TEXT, last_error TEXT, sent_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, owner_id TEXT, lease_token TEXT)"
+    )
+    connection.commit()
+    connection.close()
+    with pytest.raises(RuntimeError, match="decisions.idempotency_key"):
+        SQLiteDecisionPersistence(path)
+
+
+def test_schema_validation_rejects_missing_outbox_idempotency_unique_constraint(tmp_path):
+    path = tmp_path / "no-outbox-unique.db"
+    connection = sqlite3.connect(path)
+    connection.execute(
+        "CREATE TABLE decisions (idempotency_key TEXT PRIMARY KEY, decision_status TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "CREATE TABLE outbox (event_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL, payload_json TEXT NOT NULL, status TEXT NOT NULL, attempt_count INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT, locked_until TEXT, last_error TEXT, sent_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, owner_id TEXT, lease_token TEXT)"
+    )
+    connection.commit()
+    connection.close()
+    with pytest.raises(RuntimeError, match="outbox.idempotency_key"):
+        SQLiteDecisionPersistence(path)
