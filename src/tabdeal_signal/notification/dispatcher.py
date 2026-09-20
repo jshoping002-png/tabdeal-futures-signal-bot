@@ -9,7 +9,7 @@ from tabdeal_signal.notification.contracts import (
     NotificationResult,
     NotificationSender,
 )
-from tabdeal_signal.persistence.outbox import OutboxRepository
+from tabdeal_signal.persistence.outbox import OutboxRepository, OutboxStatus
 from tabdeal_signal.persistence.reliability import OutboxLease
 
 
@@ -42,6 +42,10 @@ def dispatch_outbox_message(
         raise ValueError("reference_time must be timezone-aware")
     if lease.is_expired_at(reference_time):
         raise ValueError("lease is expired")
+    if request.message.status is not OutboxStatus.PENDING:
+        raise ValueError("outbox message must be PENDING before delivery")
+    if not callable(getattr(sender, "send", None)):
+        raise ValueError("sender must provide a callable send method")
 
     result = sender.send(request)
     if not isinstance(result, NotificationResult):

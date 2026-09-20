@@ -401,3 +401,62 @@ def test_invalid_lifecycle_operations_are_rejected(tmp_path):
             )
     finally:
         db.close()
+
+
+class _PersistInterleavingConnection:
+    def __init__(self, connection, interleave):
+        self._connection = connection
+        self._interleave = interleave
+        self._triggered = False
+
+    def execute(self, sql, parameters=()):
+        cursor = self._connection.execute(sql, parameters)
+        if (
+            not self._triggered
+            and sql.lstrip().startswith("SELECT payload_json FROM decisions")
+        ):
+            self._triggered = True
+            self._interleave()
+        return cursor
+
+    def __enter__(self):
+        self._connection.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return self._connection.__exit__(exc_type, exc, tb)
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
+def test_concurrent_signal_replay_rejects_missing_outbox_after_winner_commits(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        request = _signal_request("key-concurrent-replay", "event-concurrent-replay")
+        payload = __import__(
+            "tabdeal_signal.persistence.sqlite",
+            fromlist=["_json_payload"],
+        )._json_payload(request)
+        raw = db._connection
+
+        def commit_winner_without_outbox():
+            raw.execute(
+                "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) VALUES (?, ?, ?, ?)",
+                (
+                    request.idempotency_key,
+                    request.decision.status.value,
+                    payload,
+                    "2026-01-01T00:00:00+00:00",
+                ),
+            )
+            raw.commit()
+
+        db._connection = _PersistInterleavingConnection(
+            raw,
+            commit_winner_without_outbox,
+        )
+        with pytest.raises(PersistenceCollisionError, match="missing outbox"):
+            db.persist(request)
+    finally:
+        db.close()
