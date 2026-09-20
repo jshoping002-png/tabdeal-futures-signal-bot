@@ -14,7 +14,10 @@ class ContractOutbox:
         self.leases = {}
 
     def enqueue(self, message: OutboxMessage) -> bool:
-        if message.idempotency_key in self.messages:
+        existing = self.messages.get(message.idempotency_key)
+        if existing is not None:
+            if existing != message:
+                raise ValueError("idempotency key collision")
             return False
         self.messages[message.idempotency_key] = message
         return True
@@ -115,6 +118,31 @@ def test_enqueue_same_idempotency_key_does_not_create_duplicate() -> None:
 
     assert repository.enqueue(first) is True
     assert repository.enqueue(second) is False
+    assert len(repository.messages) == 1
+    assert repository.messages[first.idempotency_key] == first
+
+
+def test_enqueue_idempotency_key_collision_fails_closed() -> None:
+    repository = ContractOutbox()
+    first = make_message()
+    conflicting = OutboxMessage(
+        event_id=first.event_id,
+        idempotency_key=first.idempotency_key,
+        context=first.context,
+        decision=FinalDecision(
+            status=DecisionStatus.BLOCKED,
+            reason_code="DIFFERENT_REASON",
+        ),
+        created_at=first.created_at,
+    )
+
+    assert repository.enqueue(first) is True
+    try:
+        repository.enqueue(conflicting)
+    except ValueError as exc:
+        assert str(exc) == "idempotency key collision"
+    else:
+        raise AssertionError("idempotency collision must fail closed")
     assert len(repository.messages) == 1
     assert repository.messages[first.idempotency_key] == first
 
