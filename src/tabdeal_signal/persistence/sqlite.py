@@ -131,6 +131,15 @@ class SQLiteDecisionPersistence:
                 f"persistence schema contains invalid decision payload: {invalid_decision_payload['idempotency_key']}"
             )
 
+        non_object_decision_payload = self._connection.execute(
+            "SELECT idempotency_key FROM decisions "
+            "WHERE json_valid(payload_json) = 1 AND json_type(payload_json) != 'object' LIMIT 1"
+        ).fetchone()
+        if non_object_decision_payload is not None:
+            raise RuntimeError(
+                f"persistence schema contains non-object decision payload: {non_object_decision_payload['idempotency_key']}"
+            )
+
         invalid_outbox = self._connection.execute(
             "SELECT event_id, idempotency_key FROM outbox "
             "WHERE typeof(event_id) != 'text' OR trim(event_id) = '' "
@@ -149,6 +158,34 @@ class SQLiteDecisionPersistence:
         if invalid_outbox_payload is not None:
             raise RuntimeError(
                 f"persistence schema contains invalid outbox payload: {invalid_outbox_payload['event_id']}"
+            )
+
+        non_object_outbox_payload = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE json_valid(payload_json) = 1 AND json_type(payload_json) != 'object' LIMIT 1"
+        ).fetchone()
+        if non_object_outbox_payload is not None:
+            raise RuntimeError(
+                f"persistence schema contains non-object outbox payload: {non_object_outbox_payload['event_id']}"
+            )
+
+        invalid_sent_state = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE (status = 'SENT' AND sent_at IS NULL) "
+            "OR (status != 'SENT' AND sent_at IS NOT NULL) LIMIT 1"
+        ).fetchone()
+        if invalid_sent_state is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid sent_at state: {invalid_sent_state['event_id']}"
+            )
+
+        invalid_dead_letter = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE status = 'DEAD_LETTER' AND (last_error IS NULL OR trim(last_error) = '') LIMIT 1"
+        ).fetchone()
+        if invalid_dead_letter is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid dead-letter state: {invalid_dead_letter['event_id']}"
             )
 
         invalid_link = self._connection.execute(
