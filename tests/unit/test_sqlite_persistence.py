@@ -469,3 +469,71 @@ def test_schema_validation_rejects_missing_outbox_idempotency_unique_constraint(
     connection.close()
     with pytest.raises(RuntimeError, match="outbox.idempotency_key"):
         SQLiteDecisionPersistence(path)
+
+def test_schema_validation_rejects_invalid_decision_status(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('bad-decision-status', 'CORRUPT', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid decision row"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_invalid_decision_payload(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('bad-payload', 'BLOCKED', '{bad-json', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid decision payload"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_invalid_outbox_identity(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('bad-outbox-id', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, created_at, updated_at) "
+        "VALUES ('', 'bad-outbox-id', '{}', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid outbox identity"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_invalid_outbox_payload(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('bad-outbox-payload', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, created_at, updated_at) "
+        "VALUES ('bad-outbox-event', 'bad-outbox-payload', '{bad-json', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid outbox payload"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_orphan_outbox_record(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, created_at, updated_at) "
+        "VALUES ('orphan-event', 'missing-decision', '{}', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="orphan outbox"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+

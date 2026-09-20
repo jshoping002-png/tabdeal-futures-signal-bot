@@ -111,6 +111,56 @@ class SQLiteDecisionPersistence:
                 f"persistence schema contains invalid outbox attempt_count: {invalid_attempt['attempt_count']}"
             )
 
+        invalid_decision = self._connection.execute(
+            "SELECT idempotency_key, decision_status FROM decisions "
+            "WHERE typeof(idempotency_key) != 'text' OR trim(idempotency_key) = '' "
+            "OR decision_status NOT IN ('SIGNAL', 'BLOCKED') LIMIT 1"
+        ).fetchone()
+        if invalid_decision is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid decision row: {invalid_decision['idempotency_key']}"
+            )
+
+        invalid_decision_payload = self._connection.execute(
+            "SELECT idempotency_key FROM decisions "
+            "WHERE typeof(payload_json) != 'text' OR trim(payload_json) = '' "
+            "OR json_valid(payload_json) != 1 LIMIT 1"
+        ).fetchone()
+        if invalid_decision_payload is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid decision payload: {invalid_decision_payload['idempotency_key']}"
+            )
+
+        invalid_outbox = self._connection.execute(
+            "SELECT event_id, idempotency_key FROM outbox "
+            "WHERE typeof(event_id) != 'text' OR trim(event_id) = '' "
+            "OR typeof(idempotency_key) != 'text' OR trim(idempotency_key) = '' LIMIT 1"
+        ).fetchone()
+        if invalid_outbox is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid outbox identity: {invalid_outbox['event_id']}"
+            )
+
+        invalid_outbox_payload = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE typeof(payload_json) != 'text' OR trim(payload_json) = '' "
+            "OR json_valid(payload_json) != 1 LIMIT 1"
+        ).fetchone()
+        if invalid_outbox_payload is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid outbox payload: {invalid_outbox_payload['event_id']}"
+            )
+
+        invalid_link = self._connection.execute(
+            "SELECT o.event_id FROM outbox o "
+            "LEFT JOIN decisions d ON d.idempotency_key = o.idempotency_key "
+            "WHERE d.idempotency_key IS NULL LIMIT 1"
+        ).fetchone()
+        if invalid_link is not None:
+            raise RuntimeError(
+                f"persistence schema contains orphan outbox record: {invalid_link['event_id']}"
+            )
+
         decision_pk = self._connection.execute(
             "SELECT pk FROM pragma_table_info('decisions') "
             "WHERE name = 'idempotency_key'"
