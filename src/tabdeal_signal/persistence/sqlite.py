@@ -136,6 +136,19 @@ class SQLiteDecisionPersistence:
                         (event_id, key, payload, created_at, created_at),
                     )
         except sqlite3.IntegrityError as exc:
+            # Another writer may have committed the same idempotency key after
+            # the preflight read. Treat an identical payload as a replay; only
+            # a different payload is a collision. Other integrity failures
+            # (for example an event_id collision) remain explicit failures.
+            concurrent = self._connection.execute(
+                "SELECT payload_json FROM decisions WHERE idempotency_key = ?", (key,)
+            ).fetchone()
+            if concurrent is not None:
+                if concurrent["payload_json"] == payload:
+                    return PersistenceResult(persisted=True, idempotent_replay=True)
+                raise PersistenceCollisionError(
+                    f"idempotency key collision: {key}"
+                ) from exc
             raise PersistenceCollisionError(str(exc)) from exc
 
         return PersistenceResult(persisted=True, idempotent_replay=False)
