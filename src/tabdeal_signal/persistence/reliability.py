@@ -24,7 +24,12 @@ class OutboxLease:
             raise ValueError("acquired_at must be a datetime")
         if not isinstance(self.expires_at, datetime):
             raise ValueError("expires_at must be a datetime")
-        if self.acquired_at.tzinfo is None or self.expires_at.tzinfo is None:
+        if (
+            self.acquired_at.tzinfo is None
+            or self.acquired_at.utcoffset() is None
+            or self.expires_at.tzinfo is None
+            or self.expires_at.utcoffset() is None
+        ):
             raise ValueError("lease timestamps must be timezone-aware")
         if self.acquired_at.tzinfo != self.expires_at.tzinfo:
             raise ValueError("lease timestamps must use the same timezone")
@@ -34,10 +39,12 @@ class OutboxLease:
     def is_expired_at(self, reference_time: datetime) -> bool:
         if not isinstance(reference_time, datetime):
             raise ValueError("reference_time must be a datetime")
-        if reference_time.tzinfo is None:
+        if reference_time.tzinfo is None or reference_time.utcoffset() is None:
             raise ValueError("reference_time must be timezone-aware")
         if reference_time.tzinfo != self.expires_at.tzinfo:
             raise ValueError("reference_time must use the lease timezone")
+        if reference_time < self.acquired_at:
+            raise ValueError("reference_time cannot precede lease acquisition")
         return reference_time >= self.expires_at
 
 

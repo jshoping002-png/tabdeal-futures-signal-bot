@@ -65,3 +65,9 @@ def test_lease_rejects_invalid_reference_time() -> None:
 
     with pytest.raises(ValueError, match="lease timezone"):
         lease.is_expired_at(lease.expires_at.replace(tzinfo=timezone(timedelta(hours=1))))
+
+
+def test_lease_rejects_reference_before_acquisition() -> None:
+    lease = make_lease()
+    with pytest.raises(ValueError, match="precede lease acquisition"):
+        lease.is_expired_at(lease.acquired_at - timedelta(seconds=1))

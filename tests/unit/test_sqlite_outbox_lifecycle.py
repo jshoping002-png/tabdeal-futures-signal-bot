@@ -401,3 +401,56 @@ def test_invalid_lifecycle_operations_are_rejected(tmp_path):
             )
     finally:
         db.close()
+
+
+class _PersistInterleavingConnection:
+    def __init__(self, connection, interleave):
+        self._connection = connection
+        self._interleave = interleave
+        self._triggered = False
+
+    def execute(self, sql, parameters=()):
+        cursor = self._connection.execute(sql, parameters)
+        if (
+            not self._triggered
+            and sql.lstrip().startswith("SELECT payload_json FROM decisions")
+        ):
+            self._triggered = True
+            self._interleave()
+        return cursor
+
+    def __enter__(self):
+        self._connection.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return self._connection.__exit__(exc_type, exc, tb)
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
+def test_concurrent_signal_replay_rejects_missing_outbox_after_winner_commits(tmp_path) -> None:
+    path = tmp_path / "signals.db"
+    first = SQLiteDecisionPersistence(path)
+    second = SQLiteDecisionPersistence(path)
+    try:
+        request = _signal_request("key-concurrent-replay", "event-concurrent-replay")
+        second.persist(request)
+
+        def corrupt_winner():
+            second._connection.execute(
+                "DELETE FROM outbox WHERE idempotency_key = ?",
+                (request.idempotency_key,),
+            )
+            second._connection.commit()
+
+        first._connection = _PersistInterleavingConnection(
+            first._connection,
+            corrupt_winner,
+        )
+        with pytest.raises(PersistenceCollisionError, match="missing outbox"):
+            first.persist(request)
+    finally:
+        first.close()
+        second.close()
