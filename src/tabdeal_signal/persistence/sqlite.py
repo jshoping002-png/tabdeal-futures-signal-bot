@@ -111,13 +111,74 @@ class SQLiteDecisionPersistence:
                 f"persistence schema contains invalid outbox attempt_count: {invalid_attempt['attempt_count']}"
             )
 
+        decision_pk = self._connection.execute(
+            "SELECT pk FROM pragma_table_info('decisions') "
+            "WHERE name = 'idempotency_key'"
+        ).fetchone()
+        if decision_pk is None or decision_pk["pk"] != 1:
+            raise RuntimeError(
+                "persistence schema requires decisions.idempotency_key to be the primary key"
+            )
+
+        outbox_pk = self._connection.execute(
+            "SELECT pk FROM pragma_table_info('outbox') "
+            "WHERE name = 'event_id'"
+        ).fetchone()
+        if outbox_pk is None or outbox_pk["pk"] != 1:
+            raise RuntimeError(
+                "persistence schema requires outbox.event_id to be the primary key"
+            )
+
+        unique_indexes = self._connection.execute(
+            "SELECT name FROM pragma_index_list('outbox') WHERE "unique" = 1"
+        ).fetchall()
+        if not any(
+            self._connection.execute(
+                "SELECT 1 FROM pragma_index_info(?) WHERE name = 'idempotency_key'",
+                (row["name"],),
+            ).fetchone()
+            for row in unique_indexes
+        ):
+            raise RuntimeError(
+                "persistence schema requires outbox.idempotency_key to be UNIQUE"
+            )
+
         inconsistent_lease = self._connection.execute(
             "SELECT event_id FROM outbox "
-            "WHERE (owner_id IS NULL) != (lease_token IS NULL) LIMIT 1"
+            "WHERE status = 'PROCESSING' "
+            "AND (owner_id IS NULL OR lease_token IS NULL OR locked_until IS NULL) LIMIT 1"
         ).fetchone()
         if inconsistent_lease is not None:
             raise RuntimeError(
-                f"persistence schema contains incomplete outbox lease ownership: {inconsistent_lease['event_id']}"
+                f"persistence schema contains incomplete PROCESSING lease: {inconsistent_lease['event_id']}"
+            )
+
+        stale_lease_fields = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE status != 'PROCESSING' "
+            "AND (owner_id IS NOT NULL OR lease_token IS NOT NULL OR locked_until IS NOT NULL) LIMIT 1"
+        ).fetchone()
+        if stale_lease_fields is not None:
+            raise RuntimeError(
+                f"persistence schema contains lease fields outside PROCESSING: {stale_lease_fields['event_id']}"
+            )
+
+        for row in self._connection.execute(
+            "SELECT event_id, created_at, updated_at, next_attempt_at, locked_until, sent_at "
+            "FROM outbox"
+        ).fetchall():
+            for field in ("created_at", "updated_at", "next_attempt_at", "locked_until", "sent_at"):
+                value = row[field]
+                if value is not None:
+                    _validate_persisted_timestamp(
+                        value, f"outbox {row['event_id']} {field}"
+                    )
+
+        for row in self._connection.execute(
+            "SELECT idempotency_key, created_at FROM decisions"
+        ).fetchall():
+            _validate_persisted_timestamp(
+                row["created_at"], f"decision {row['idempotency_key']} created_at"
             )
 
     def _ensure_outbox_columns(self) -> None:
@@ -153,12 +214,16 @@ class SQLiteDecisionPersistence:
         payload = _json_payload(request)
         key = request.idempotency_key
         existing = self._connection.execute(
-            "SELECT payload_json FROM decisions WHERE idempotency_key = ?", (key,)
+            "SELECT payload_json, decision_status FROM decisions WHERE idempotency_key = ?", (key,)
         ).fetchone()
         if existing is not None:
             if existing["payload_json"] != payload:
                 raise PersistenceCollisionError(f"idempotency key collision: {key}")
             status = getattr(getattr(request.decision, "status", None), "value", request.decision.status)
+            if existing["decision_status"] != status:
+                raise PersistenceCollisionError(
+                    f"decision persistence is inconsistent: {key}"
+                )
             if status == "SIGNAL":
                 event_id = _event_id(request)
                 outbox = self._connection.execute(
@@ -169,6 +234,15 @@ class SQLiteDecisionPersistence:
                     raise PersistenceCollisionError(f"signal persistence is incomplete: missing outbox for {key}")
                 if outbox["event_id"] != event_id or outbox["payload_json"] != payload:
                     raise PersistenceCollisionError(f"signal persistence is inconsistent: {key}")
+            else:
+                orphan_outbox = self._connection.execute(
+                    "SELECT event_id FROM outbox WHERE idempotency_key = ?",
+                    (key,),
+                ).fetchone()
+                if orphan_outbox is not None:
+                    raise PersistenceCollisionError(
+                        f"non-signal persistence is inconsistent: {key}"
+                    )
             return PersistenceResult(persisted=True, idempotent_replay=True)
 
         decision = request.decision
@@ -205,6 +279,10 @@ class SQLiteDecisionPersistence:
                     raise PersistenceCollisionError(
                         f"idempotency key collision: {key}"
                     ) from exc
+                if concurrent["decision_status"] != status:
+                    raise PersistenceCollisionError(
+                        f"decision persistence is inconsistent: {key}"
+                    ) from exc
                 if status == "SIGNAL":
                     event_id = _event_id(request)
                     outbox = self._connection.execute(
@@ -221,6 +299,15 @@ class SQLiteDecisionPersistence:
                     ):
                         raise PersistenceCollisionError(
                             f"signal persistence is inconsistent: {key}"
+                        ) from exc
+                else:
+                    orphan_outbox = self._connection.execute(
+                        "SELECT event_id FROM outbox WHERE idempotency_key = ?",
+                        (key,),
+                    ).fetchone()
+                    if orphan_outbox is not None:
+                        raise PersistenceCollisionError(
+                            f"non-signal persistence is inconsistent: {key}"
                         ) from exc
                 return PersistenceResult(persisted=True, idempotent_replay=True)
             raise PersistenceCollisionError(str(exc)) from exc
@@ -456,6 +543,19 @@ def _utc_timestamp(value: str | None) -> str:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("timestamp must be timezone-aware")
     return parsed.astimezone(timezone.utc).isoformat()
+
+
+def _validate_persisted_timestamp(value: str, field: str) -> None:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(f"persistence contains invalid {field} timestamp")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise RuntimeError(f"persistence contains invalid {field} timestamp") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise RuntimeError(f"persistence contains timezone-naive {field} timestamp")
+    if parsed.astimezone(timezone.utc).isoformat() != value:
+        raise RuntimeError(f"persistence contains non-canonical UTC {field} timestamp")
 
 
 def _plus_seconds(timestamp: str, seconds: int) -> str:
