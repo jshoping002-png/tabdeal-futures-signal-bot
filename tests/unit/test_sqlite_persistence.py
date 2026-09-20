@@ -279,3 +279,87 @@ def test_sent_outbox_record_is_not_claimed_again(tmp_path):
         assert row["locked_until"] is None
     finally:
         db.close()
+
+
+def test_schema_validation_rejects_missing_required_decision_column(tmp_path) -> None:
+    path = tmp_path / "legacy.db"
+    import sqlite3
+
+    connection = sqlite3.connect(path)
+    connection.execute(
+        "CREATE TABLE decisions (idempotency_key TEXT PRIMARY KEY, decision_status TEXT NOT NULL, payload_json TEXT NOT NULL)"
+    )
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(RuntimeError, match="decisions.*created_at"):
+        SQLiteDecisionPersistence(path)
+
+
+def test_schema_validation_rejects_missing_required_outbox_column(tmp_path) -> None:
+    path = tmp_path / "legacy.db"
+    import sqlite3
+
+    connection = sqlite3.connect(path)
+    connection.execute(
+        "CREATE TABLE decisions (idempotency_key TEXT PRIMARY KEY, decision_status TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL)"
+    )
+    connection.execute(
+        "CREATE TABLE outbox (idempotency_key TEXT NOT NULL UNIQUE, payload_json TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(RuntimeError, match="outbox.*event_id"):
+        SQLiteDecisionPersistence(path)
+
+
+def test_schema_validation_rejects_invalid_outbox_status(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('bad-key', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, created_at, updated_at) "
+        "VALUES ('bad-event', 'bad-key', '{}', 'CORRUPT', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+
+    with pytest.raises(RuntimeError, match="invalid outbox status"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_negative_attempt_count(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('bad-key', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, attempt_count, created_at, updated_at) "
+        "VALUES ('bad-event', 'bad-key', '{}', 'PENDING', -1, '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+
+    with pytest.raises(RuntimeError, match="invalid outbox attempt_count"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_half_populated_lease_owner(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('bad-key', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, created_at, updated_at, owner_id) "
+        "VALUES ('bad-event', 'bad-key', '{}', 'PROCESSING', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00', 'worker-1')"
+    )
+    db._connection.commit()
+    db.close()
+
+    with pytest.raises(RuntimeError, match="incomplete outbox lease"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
