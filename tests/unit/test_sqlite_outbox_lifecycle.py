@@ -401,3 +401,19 @@ def test_invalid_lifecycle_operations_are_rejected(tmp_path):
             )
     finally:
         db.close()
+
+
+def test_signal_concurrent_replay_requires_consistent_outbox_state(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        request = _signal_request("key-concurrent-replay", "event-concurrent-replay")
+        db.persist(request)
+        db._connection.execute(
+            "DELETE FROM outbox WHERE idempotency_key = ?",
+            (request.idempotency_key,),
+        )
+        db._connection.commit()
+        with pytest.raises(PersistenceCollisionError, match="missing outbox"):
+            db.persist(request)
+    finally:
+        db.close()

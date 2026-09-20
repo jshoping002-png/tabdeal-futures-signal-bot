@@ -149,3 +149,47 @@ def test_invalid_request_is_rejected() -> None:
 
     with pytest.raises(ValueError, match="NotificationRequest"):
         dispatch(object(), sender, outbox)
+
+
+def test_delivery_rejects_reference_before_lease_acquisition() -> None:
+    request = make_request()
+    sender = FakeSender(NotificationResult(NotificationOutcome.DELIVERED, "DELIVERED"))
+    outbox = FakeOutbox()
+    lease = make_lease()
+    with pytest.raises(ValueError, match="precede lease acquisition"):
+        dispatch(
+            request,
+            sender,
+            outbox,
+            lease=lease,
+            reference_time=lease.acquired_at - timedelta(seconds=1),
+        )
+    assert sender.requests == []
+    assert outbox.marked == []
+
+
+def test_delivery_rejects_already_delivered_message() -> None:
+    from tabdeal_signal.persistence.outbox import OutboxStatus
+
+    request = make_request()
+    delivered = OutboxMessage(
+        event_id=request.message.event_id,
+        idempotency_key=request.message.idempotency_key,
+        context=request.message.context,
+        decision=request.message.decision,
+        created_at=request.message.created_at,
+        status=OutboxStatus.DELIVERED,
+    )
+    request = NotificationRequest(message=delivered)
+    sender = FakeSender(NotificationResult(NotificationOutcome.DELIVERED, "DELIVERED"))
+    outbox = FakeOutbox()
+    with pytest.raises(ValueError, match="must be PENDING"):
+        dispatch(request, sender, outbox)
+    assert sender.requests == []
+
+
+def test_delivery_rejects_sender_without_send_method() -> None:
+    request = make_request()
+    outbox = FakeOutbox()
+    with pytest.raises(ValueError, match="callable send"):
+        dispatch(request, object(), outbox)
