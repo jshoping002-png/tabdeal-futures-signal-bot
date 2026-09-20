@@ -74,6 +74,51 @@ class SQLiteDecisionPersistence:
         )
         self._connection.commit()
         self._ensure_outbox_columns()
+        self._validate_schema_state()
+
+    def _validate_schema_state(self) -> None:
+        required = {
+            "decisions": {"idempotency_key", "decision_status", "payload_json", "created_at"},
+            "outbox": {
+                "event_id", "idempotency_key", "payload_json", "status",
+                "attempt_count", "next_attempt_at", "locked_until", "last_error",
+                "sent_at", "created_at", "updated_at", "owner_id", "lease_token",
+            },
+        }
+        for table, columns in required.items():
+            actual = {row["name"] for row in self._connection.execute(f"PRAGMA table_info({table})").fetchall()}
+            missing = sorted(columns - actual)
+            if missing:
+                raise RuntimeError(
+                    f"persistence schema is incomplete for {table}: missing {', '.join(missing)}"
+                )
+
+        invalid_status = self._connection.execute(
+            "SELECT event_id, status FROM outbox "
+            "WHERE status NOT IN ('PENDING', 'PROCESSING', 'RETRY', 'SENT', 'DEAD_LETTER') LIMIT 1"
+        ).fetchone()
+        if invalid_status is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid outbox status: {invalid_status['status']}"
+            )
+
+        invalid_attempt = self._connection.execute(
+            "SELECT event_id, attempt_count FROM outbox "
+            "WHERE typeof(attempt_count) != 'integer' OR attempt_count < 0 LIMIT 1"
+        ).fetchone()
+        if invalid_attempt is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid outbox attempt_count: {invalid_attempt['attempt_count']}"
+            )
+
+        inconsistent_lease = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE (owner_id IS NULL) != (lease_token IS NULL) LIMIT 1"
+        ).fetchone()
+        if inconsistent_lease is not None:
+            raise RuntimeError(
+                f"persistence schema contains incomplete outbox lease ownership: {inconsistent_lease['event_id']}"
+            )
 
     def _ensure_outbox_columns(self) -> None:
         """Add lifecycle columns to databases created by earlier revisions."""
