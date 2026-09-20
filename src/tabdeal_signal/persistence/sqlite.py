@@ -113,6 +113,17 @@ class SQLiteDecisionPersistence:
         if existing is not None:
             if existing["payload_json"] != payload:
                 raise PersistenceCollisionError(f"idempotency key collision: {key}")
+            status = getattr(getattr(request.decision, "status", None), "value", request.decision.status)
+            if status == "SIGNAL":
+                event_id = _event_id(request)
+                outbox = self._connection.execute(
+                    "SELECT event_id, idempotency_key, payload_json FROM outbox WHERE idempotency_key = ?",
+                    (key,),
+                ).fetchone()
+                if outbox is None:
+                    raise PersistenceCollisionError(f"signal persistence is incomplete: missing outbox for {key}")
+                if outbox["event_id"] != event_id or outbox["payload_json"] != payload:
+                    raise PersistenceCollisionError(f"signal persistence is inconsistent: {key}")
             return PersistenceResult(persisted=True, idempotent_replay=True)
 
         decision = request.decision
@@ -161,8 +172,8 @@ class SQLiteDecisionPersistence:
         owner_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Atomically claim eligible records and assign an ownership token."""
-        if lease_seconds <= 0 or limit <= 0:
-            raise ValueError("lease_seconds and limit must be positive")
+        if (isinstance(lease_seconds, bool) or not isinstance(lease_seconds, int) or lease_seconds <= 0 or isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0):
+            raise ValueError("lease_seconds and limit must be positive integers")
         if owner_id is not None and (
             not isinstance(owner_id, str) or not owner_id.strip()
         ):

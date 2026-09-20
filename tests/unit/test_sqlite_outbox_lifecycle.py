@@ -325,6 +325,58 @@ def test_lifecycle_mutations_reject_blank_event_ids(tmp_path):
         db.close()
 
 
+def test_claim_rejects_boolean_or_non_integer_limits(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        with pytest.raises(ValueError, match="positive integers"):
+            db.claim_pending_outbox(lease_seconds=True)
+        with pytest.raises(ValueError, match="positive integers"):
+            db.claim_pending_outbox(limit=True)
+        with pytest.raises(ValueError, match="positive integers"):
+            db.claim_pending_outbox(lease_seconds=1.5)
+    finally:
+        db.close()
+
+
+def test_signal_replay_requires_complete_outbox_state(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        request = _signal_request("key-replay-integrity", "event-replay-integrity")
+        db.persist(request)
+        db._connection.execute("DELETE FROM outbox WHERE idempotency_key = ?", (request.idempotency_key,))
+        db._connection.commit()
+        with pytest.raises(PersistenceCollisionError, match="missing outbox"):
+            db.persist(request)
+    finally:
+        db.close()
+
+
+def test_signal_replay_rejects_inconsistent_outbox_payload(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        request = _signal_request("key-replay-payload", "event-replay-payload")
+        db.persist(request)
+        db._connection.execute("UPDATE outbox SET payload_json = ? WHERE idempotency_key = ?", ("{}", request.idempotency_key))
+        db._connection.commit()
+        with pytest.raises(PersistenceCollisionError, match="inconsistent"):
+            db.persist(request)
+    finally:
+        db.close()
+
+
+def test_signal_replay_rejects_inconsistent_event_id(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        request = _signal_request("key-replay-event", "event-replay-event")
+        db.persist(request)
+        db._connection.execute("UPDATE outbox SET event_id = ? WHERE idempotency_key = ?", ("event-other", request.idempotency_key))
+        db._connection.commit()
+        with pytest.raises(PersistenceCollisionError, match="inconsistent"):
+            db.persist(request)
+    finally:
+        db.close()
+
+
 def test_invalid_lifecycle_operations_are_rejected(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
