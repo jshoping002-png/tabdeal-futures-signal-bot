@@ -154,6 +154,153 @@ def test_retry_and_dead_letter_transitions_require_exact_lease(tmp_path):
         db.close()
 
 
+class _InterleavingConnection:
+    def __init__(self, connection, interleave):
+        self._connection = connection
+        self._interleave = interleave
+        self._triggered = False
+
+    def execute(self, sql, parameters=()):
+        cursor = self._connection.execute(sql, parameters)
+        if not self._triggered and sql.lstrip().startswith("SELECT rowid AS internal_id FROM outbox"):
+            return _InterleavingCursor(cursor, self._interleave, self)
+        return cursor
+
+    def __enter__(self):
+        self._connection.__enter__()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return self._connection.__exit__(exc_type, exc, tb)
+
+    def __getattr__(self, name):
+        return getattr(self._connection, name)
+
+
+class _InterleavingCursor:
+    def __init__(self, cursor, interleave, owner):
+        self._cursor = cursor
+        self._interleave = interleave
+        self._owner = owner
+
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        if not self._owner._triggered:
+            self._owner._triggered = True
+            self._owner._connection.commit()
+            self._interleave()
+        return rows
+
+    def __getattr__(self, name):
+        return getattr(self._cursor, name)
+
+
+def test_claim_is_exclusive_when_another_worker_wins_between_select_and_update(tmp_path):
+    path = tmp_path / "signals.db"
+    first = SQLiteDecisionPersistence(path)
+    second = SQLiteDecisionPersistence(path)
+    try:
+        first.persist(_signal_request("key-race", "event-race"))
+        second_claimed = []
+        first._connection = _InterleavingConnection(
+            first._connection,
+            lambda: second_claimed.extend(
+                second.claim_pending_outbox(
+                    now="2026-01-01T00:00:00+00:00",
+                    owner_id="worker-2",
+                )
+            ),
+        )
+        assert first.claim_pending_outbox(
+            now="2026-01-01T00:00:00+00:00",
+            owner_id="worker-1",
+        ) == []
+        assert len(second_claimed) == 1
+        row = first._connection.execute(
+            "SELECT status, owner_id FROM outbox WHERE event_id = ?",
+            ("event-race",),
+        ).fetchone()
+        assert row["status"] == "PROCESSING"
+        assert row["owner_id"] == "worker-2"
+    finally:
+        first.close()
+        second.close()
+
+
+def test_lifecycle_timestamps_are_stored_as_utc(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(_signal_request("key-time", "event-time"))
+        now = datetime.now(timezone.utc).replace(microsecond=0)
+        local_tz = timezone(timedelta(hours=3))
+        local_now = now.astimezone(local_tz).isoformat()
+        claimed = db.claim_pending_outbox(
+            now=local_now,
+            lease_seconds=60,
+            owner_id="worker-1",
+        )[0]
+        assert claimed["updated_at"] == now.isoformat()
+        assert claimed["locked_until"] == (now + timedelta(seconds=60)).isoformat()
+        retry_at = now + timedelta(minutes=5)
+        retry_local = retry_at.astimezone(timezone(timedelta(hours=4))).isoformat()
+        db.mark_outbox_retry(
+            "event-time",
+            next_attempt_at=retry_local,
+            error="temporary",
+            **_lease_fields(claimed),
+        )
+        row = db._connection.execute(
+            "SELECT next_attempt_at FROM outbox WHERE event_id = ?",
+            ("event-time",),
+        ).fetchone()
+        assert row["next_attempt_at"] == retry_at.isoformat()
+    finally:
+        db.close()
+
+
+def test_invalid_lifecycle_timestamps_are_rejected(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(_signal_request("key-invalid-time", "event-invalid-time"))
+        with pytest.raises(ValueError, match="timezone-aware"):
+            db.claim_pending_outbox(
+                now="2026-01-01T00:00:00",
+                owner_id="worker-1",
+            )
+        claimed = db.claim_pending_outbox(
+            now=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            owner_id="worker-1",
+        )[0]
+        with pytest.raises(ValueError, match="timezone-aware"):
+            db.mark_outbox_retry(
+                "event-invalid-time",
+                next_attempt_at="2026-01-01T00:05:00",
+                error="temporary",
+                **_lease_fields(claimed),
+            )
+    finally:
+        db.close()
+
+
+def test_non_string_lifecycle_error_is_rejected(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(_signal_request("key-error-type", "event-error-type"))
+        claimed = db.claim_pending_outbox(
+            now=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            owner_id="worker-1",
+        )[0]
+        with pytest.raises(ValueError, match="non-empty string"):
+            db.mark_outbox_retry(
+                "event-error-type",
+                next_attempt_at=(datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat(),
+                error=None,
+                **_lease_fields(claimed),
+            )
+    finally:
+        db.close()
+
+
 def test_invalid_lifecycle_operations_are_rejected(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:
