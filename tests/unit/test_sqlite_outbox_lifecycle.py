@@ -301,6 +301,30 @@ def test_non_string_lifecycle_error_is_rejected(tmp_path):
         db.close()
 
 
+def test_dead_letter_and_quarantine_validate_input_types(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(_signal_request("key-validation-1", "event-validation-1"))
+        claimed = db.claim_pending_outbox(now=_now_text(), owner_id="worker-1")[0]
+        with pytest.raises(ValueError, match="non-empty string"):
+            db.mark_outbox_dead_letter("event-validation-1", None, **_lease_fields(claimed))
+        with pytest.raises(ValueError, match="positive integer"):
+            db.quarantine_outbox_record(True, "bad id", **_lease_fields(claimed))
+    finally:
+        db.close()
+
+
+def test_lifecycle_mutations_reject_blank_event_ids(tmp_path):
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    try:
+        db.persist(_signal_request("key-validation-2", "event-validation-2"))
+        claimed = db.claim_pending_outbox(now=_now_text(), owner_id="worker-1")[0]
+        with pytest.raises(ValueError, match="event_id must be a non-empty string"):
+            db.mark_outbox_sent("", **_lease_fields(claimed))
+    finally:
+        db.close()
+
+
 def test_invalid_lifecycle_operations_are_rejected(tmp_path):
     db = SQLiteDecisionPersistence(tmp_path / "signals.db")
     try:

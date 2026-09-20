@@ -212,6 +212,11 @@ class SQLiteDecisionPersistence:
         return claimed
 
     @staticmethod
+    def _validate_event_id(event_id: str) -> None:
+        if not isinstance(event_id, str) or not event_id.strip():
+            raise ValueError("event_id must be a non-empty string")
+
+    @staticmethod
     def _validate_lease(owner_id: str, lease_token: str) -> None:
         if (
             not isinstance(owner_id, str)
@@ -229,6 +234,7 @@ class SQLiteDecisionPersistence:
         owner_id: str,
         lease_token: str,
     ) -> None:
+        self._validate_event_id(event_id)
         self._validate_lease(owner_id, lease_token)
         timestamp = _utc_timestamp(sent_at)
         checked_at = _utc_now()
@@ -259,6 +265,7 @@ class SQLiteDecisionPersistence:
     ) -> None:
         if not isinstance(error, str) or not error.strip():
             raise ValueError("error must be a non-empty string")
+        self._validate_event_id(event_id)
         self._validate_lease(owner_id, lease_token)
         timestamp = _utc_now()
         retry_at = _utc_timestamp(next_attempt_at)
@@ -293,8 +300,9 @@ class SQLiteDecisionPersistence:
         owner_id: str,
         lease_token: str,
     ) -> None:
-        if not error.strip():
-            raise ValueError("error must be non-empty")
+        if not isinstance(error, str) or not error.strip():
+            raise ValueError("error must be a non-empty string")
+        self._validate_event_id(event_id)
         self._validate_lease(owner_id, lease_token)
         timestamp = _utc_now()
         with self._connection:
@@ -320,10 +328,10 @@ class SQLiteDecisionPersistence:
         owner_id: str,
         lease_token: str,
     ) -> None:
-        if not isinstance(internal_id, int) or internal_id <= 0:
-            raise ValueError("internal_id must be positive")
-        if not error.strip():
-            raise ValueError("error must be non-empty")
+        if isinstance(internal_id, bool) or not isinstance(internal_id, int) or internal_id <= 0:
+            raise ValueError("internal_id must be a positive integer")
+        if not isinstance(error, str) or not error.strip():
+            raise ValueError("error must be a non-empty string")
         self._validate_lease(owner_id, lease_token)
         timestamp = _utc_now()
         with self._connection:
