@@ -619,3 +619,92 @@ def test_schema_validation_rejects_dead_letter_without_error(tmp_path):
     db.close()
     with pytest.raises(RuntimeError, match="invalid dead-letter state"):
         SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+def test_schema_validation_rejects_pending_row_with_retry_or_error_state(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('pending-state', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, next_attempt_at, last_error, "
+        "created_at, updated_at) VALUES ('pending-state-event', 'pending-state', '{}', 'PENDING', "
+        "'2026-01-01T00:01:00+00:00', 'stale', '2026-01-01T00:00:00+00:00', "
+        "'2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid pending lifecycle state"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_processing_row_with_retry_schedule(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('processing-state', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, next_attempt_at, locked_until, "
+        "owner_id, lease_token, created_at, updated_at) VALUES ('processing-state-event', 'processing-state', '{}', "
+        "'PROCESSING', '2026-01-01T00:01:00+00:00', '2026-01-01T00:02:00+00:00', "
+        "'worker-1', 'token-1', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid processing lifecycle state"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_retry_without_schedule_or_error(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('retry-state', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, created_at, updated_at) "
+        "VALUES ('retry-state-event', 'retry-state', '{}', 'RETRY', "
+        "'2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid retry lifecycle state"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_sent_row_with_stale_retry_fields(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('sent-lifecycle', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, sent_at, next_attempt_at, "
+        "last_error, created_at, updated_at) VALUES ('sent-lifecycle-event', 'sent-lifecycle', '{}', 'SENT', "
+        "'2026-01-01T00:01:00+00:00', '2026-01-01T00:02:00+00:00', 'stale', "
+        "'2026-01-01T00:00:00+00:00', '2026-01-01T00:01:00+00:00')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid sent lifecycle state"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+
+
+def test_schema_validation_rejects_dead_letter_with_stale_retry_fields(tmp_path) -> None:
+    db = SQLiteDecisionPersistence(tmp_path / "signals.db")
+    db._connection.execute(
+        "INSERT INTO decisions (idempotency_key, decision_status, payload_json, created_at) "
+        "VALUES ('dead-letter-lifecycle', 'SIGNAL', '{}', '2026-01-01T00:00:00+00:00')"
+    )
+    db._connection.execute(
+        "INSERT INTO outbox (event_id, idempotency_key, payload_json, status, next_attempt_at, "
+        "created_at, updated_at, last_error) VALUES ('dead-letter-lifecycle-event', 'dead-letter-lifecycle', '{}', "
+        "'DEAD_LETTER', '2026-01-01T00:02:00+00:00', '2026-01-01T00:00:00+00:00', "
+        "'2026-01-01T00:01:00+00:00', 'permanent failure')"
+    )
+    db._connection.commit()
+    db.close()
+    with pytest.raises(RuntimeError, match="invalid dead-letter lifecycle state"):
+        SQLiteDecisionPersistence(tmp_path / "signals.db")
+

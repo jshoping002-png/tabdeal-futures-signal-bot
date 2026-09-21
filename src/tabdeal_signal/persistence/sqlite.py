@@ -188,6 +188,70 @@ class SQLiteDecisionPersistence:
                 f"persistence schema contains invalid dead-letter state: {invalid_dead_letter['event_id']}"
             )
 
+        invalid_pending_state = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE status = 'PENDING' AND ("
+            "next_attempt_at IS NOT NULL OR locked_until IS NOT NULL "
+            "OR owner_id IS NOT NULL OR lease_token IS NOT NULL "
+            "OR last_error IS NOT NULL OR sent_at IS NOT NULL"
+            ") LIMIT 1"
+        ).fetchone()
+        if invalid_pending_state is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid pending lifecycle state: {invalid_pending_state['event_id']}"
+            )
+
+        invalid_processing_state = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE status = 'PROCESSING' AND ("
+            "next_attempt_at IS NOT NULL OR sent_at IS NOT NULL "
+            "OR last_error IS NOT NULL"
+            ") LIMIT 1"
+        ).fetchone()
+        if invalid_processing_state is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid processing lifecycle state: {invalid_processing_state['event_id']}"
+            )
+
+        invalid_retry_state = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE status = 'RETRY' AND ("
+            "next_attempt_at IS NULL OR trim(next_attempt_at) = '' "
+            "OR last_error IS NULL OR trim(last_error) = '' "
+            "OR sent_at IS NOT NULL"
+            ") LIMIT 1"
+        ).fetchone()
+        if invalid_retry_state is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid retry lifecycle state: {invalid_retry_state['event_id']}"
+            )
+
+        invalid_sent_lifecycle = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE status = 'SENT' AND ("
+            "next_attempt_at IS NOT NULL OR last_error IS NOT NULL "
+            "OR locked_until IS NOT NULL OR owner_id IS NOT NULL "
+            "OR lease_token IS NOT NULL"
+            ") LIMIT 1"
+        ).fetchone()
+        if invalid_sent_lifecycle is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid sent lifecycle state: {invalid_sent_lifecycle['event_id']}"
+            )
+
+        invalid_dead_letter_lifecycle = self._connection.execute(
+            "SELECT event_id FROM outbox "
+            "WHERE status = 'DEAD_LETTER' AND ("
+            "next_attempt_at IS NOT NULL OR sent_at IS NOT NULL "
+            "OR locked_until IS NOT NULL OR owner_id IS NOT NULL "
+            "OR lease_token IS NOT NULL"
+            ") LIMIT 1"
+        ).fetchone()
+        if invalid_dead_letter_lifecycle is not None:
+            raise RuntimeError(
+                f"persistence schema contains invalid dead-letter lifecycle state: {invalid_dead_letter_lifecycle['event_id']}"
+            )
+
         invalid_link = self._connection.execute(
             "SELECT o.event_id FROM outbox o "
             "LEFT JOIN decisions d ON d.idempotency_key = o.idempotency_key "
@@ -442,7 +506,7 @@ class SQLiteDecisionPersistence:
                     """
                     UPDATE outbox
                     SET status = 'PROCESSING', attempt_count = attempt_count + 1,
-                        locked_until = ?, updated_at = ?, last_error = NULL,
+                        next_attempt_at = NULL, locked_until = ?, updated_at = ?, last_error = NULL,
                         owner_id = ?, lease_token = ?
                     WHERE rowid = ?
                       AND (
@@ -561,7 +625,7 @@ class SQLiteDecisionPersistence:
             cursor = self._connection.execute(
                 """
                 UPDATE outbox
-                SET status='DEAD_LETTER', locked_until=NULL,
+                SET status='DEAD_LETTER', next_attempt_at=NULL, locked_until=NULL,
                     last_error=?, updated_at=?, owner_id=NULL, lease_token=NULL
                 WHERE event_id = ? AND status = 'PROCESSING'
                   AND owner_id = ? AND lease_token = ?
